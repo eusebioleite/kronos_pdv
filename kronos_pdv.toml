@@ -1,0 +1,147 @@
+########################################################## APP CONFIG ###########################################################
+
+[config]
+auth_url = "https://auth.dolphinsistemas.com.br/realms/dealercrm/protocol/openid-connect/token"
+api_url = "https://api-treino-kronospet.dealercrm.com.br"
+crm_url = "https://treino-kronospet.dealercrm.com.br"
+client_id = "treino-kronospet-1778695296950"
+client_secret = "K74VIJ6QgmqIY5IaSJ5ThjYvn2yvxbl0sinbxNyQeRX"
+context_guid = "af1a5eb4-6d54-11f0-8ce7-baccb1227f9a"
+port = 9558
+debug = true
+
+########################################################## MOGI MIRIM ###########################################################
+[company.mogi_mirim]
+code = 100
+
+[company.mogi_mirim.columns.pedido_em_carteira]
+code = 46
+name = "PEDIDO EM CARTEIRA"
+
+[company.mogi_mirim.columns.producao]
+code = 1
+name = "PRODUCAO"
+
+[company.mogi_mirim.columns.empenho]
+code = 48
+name = "EMPENHO"
+
+[company.mogi_mirim.columns.ordem_separacao]
+code = 25
+name = "ORDEM SEPARACAO"
+
+[company.mogi_mirim.columns.separacao]
+code = 26
+name = "SEPARACAO"
+
+[company.mogi_mirim.columns.faturamento]
+code = 4
+name = "FATURAMENTO"
+
+[company.mogi_mirim.columns.qualidade]
+code = 98
+name = "QUALIDADE"
+
+[company.mogi_mirim.columns.coleta]
+code = 155
+name = "COLETA"
+
+[company.mogi_mirim.columns.carregamento]
+code = 65
+name = "CARREGAMENTO"
+
+[company.mogi_mirim.columns.em_transito]
+code = 49
+name = "EM TRANSITO"
+
+[company.mogi_mirim.columns.canhoto]
+code = 183
+name = "CANHOTO"
+
+[company.mogi_mirim.columns.pedido_cancelado]
+code = 9
+name = "PEDIDO CANCELADO"
+
+[company.mogi_mirim.columns.finalizado]
+code = 8
+name = "FINALIZADO"
+
+[company.mogi_mirim.users.paulo]
+code = 10
+name = "Paulo Carvalho"
+
+[company.mogi_mirim.users.felipe]
+code = 16
+name = "Felipe Jachetta"
+
+
+[company.mogi_mirim.users.maicon]
+code = 16
+name = "Maicon Rosetti"
+
+
+[company.mogi_mirim.users.diego]
+code = 16
+name = "Diego"
+
+
+[company.mogi_mirim.users.maria]
+code = 16
+name = "Maria Marizélia"
+
+[company.mogi_mirim.users.cristiane]
+code = 16
+name = "Cristiane"
+
+########################################################## JACUTINGA ###########################################################
+
+[company.jacutinga]
+code = 110
+
+[company.jacutinga.columns.pedido_em_carteira]
+code = 84
+name = "PEDIDO EM CARTEIRA"
+
+[company.jacutinga.users.thiago]
+code = 4666
+name = "Thiago Coelho"
+
+########################################################## MARINGA ##############################################################
+
+[company.maringa]
+code = 120
+
+[company.maringa.columns.pedido_em_carteira]
+code = 178
+name = "PEDIDO EM CARTEIRA"
+
+[company.maringa.users.andre]
+code = 4686
+name = "André Costa"
+
+########################################################## VENDEDORES ###########################################################
+
+[requesters.a_cutri]
+code = 5
+name = "A.CUTRI"
+
+[requesters.t_moreira]
+code = 6
+name = "T.MOREIRA"
+
+[requesters.m_moraes]
+code = 7
+name = "M.MORAES"
+
+[requesters.a_mendes]
+code = 8
+name = "A.MENDES"
+
+[requesters.p_migliari]
+code = 9
+name = "P.MIGLIARI"
+
+
+[requesters.default]
+code = 4688
+name = "DEFAULT"
