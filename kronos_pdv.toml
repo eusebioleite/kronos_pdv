@@ -19,81 +19,99 @@ code = 100
 [company.mogi_mirim.columns.pedido_em_carteira]
 code = 46
 name = "PEDIDO EM CARTEIRA"
+responsible = "paulo"
 
 [company.mogi_mirim.columns.producao]
 code = 1
 name = "PRODUCAO"
+responsible = "paulo"
 
 [company.mogi_mirim.columns.empenho]
 code = 48
 name = "EMPENHO"
+responsible = "comercial"
 
 [company.mogi_mirim.columns.ordem_separacao]
 code = 25
 name = "ORDEM SEPARACAO"
+responsible = "felipe"
 
 [company.mogi_mirim.columns.separacao]
 code = 26
 name = "SEPARACAO"
+responsible = "felipe"
 
 [company.mogi_mirim.columns.faturamento]
 code = 4
 name = "FATURAMENTO"
+responsible = "cristiane"
 
 [company.mogi_mirim.columns.qualidade]
 code = 98
 name = "QUALIDADE"
+responsible = "maria"
 
 [company.mogi_mirim.columns.coleta]
 code = 155
 name = "COLETA"
+responsible = "diego"
 
 [company.mogi_mirim.columns.carregamento]
 code = 65
 name = "CARREGAMENTO"
+responsible = "diego"
 
 [company.mogi_mirim.columns.em_transito]
 code = 49
 name = "EM TRANSITO"
+responsible = "diego"
 
 [company.mogi_mirim.columns.canhoto]
 code = 183
 name = "CANHOTO"
+responsible = "diego"
 
 [company.mogi_mirim.columns.pedido_cancelado]
 code = 9
 name = "PEDIDO CANCELADO"
+responsible = "comercial"
 
 [company.mogi_mirim.columns.finalizado]
 code = 8
 name = "FINALIZADO"
+responsible = "comercial"
 
 [company.mogi_mirim.users.paulo]
 code = 10
-name = "Paulo Carvalho"
+name = "Paulo"
 
 [company.mogi_mirim.users.felipe]
 code = 16
-name = "Felipe Jachetta"
-
+name = "Felipe"
 
 [company.mogi_mirim.users.maicon]
-code = 16
-name = "Maicon Rosetti"
-
+code = 18
+name = "Maicon"
 
 [company.mogi_mirim.users.diego]
-code = 16
+code = 20
 name = "Diego"
 
-
 [company.mogi_mirim.users.maria]
-code = 16
-name = "Maria Marizélia"
+code = 22
+name = "Maria"
 
 [company.mogi_mirim.users.cristiane]
-code = 16
-name = "Cristiane"
+code = 4
+name = "Cris"
+
+[company.mogi_mirim.users.comercial]
+code = 999
+name = "comercial"
+
+[company.mogi_mirim.columns.separacao.product_override]
+PREFORMA = "felipe"
+FRASCO = "maicon"
 
 ########################################################## JACUTINGA ###########################################################
 
@@ -103,10 +121,15 @@ code = 110
 [company.jacutinga.columns.pedido_em_carteira]
 code = 84
 name = "PEDIDO EM CARTEIRA"
+responsible = "thiago"
 
 [company.jacutinga.users.thiago]
 code = 4666
-name = "Thiago Coelho"
+name = "Thiago"
+
+[company.jacutinga.users.comercial]
+code = 999
+name = "comercial"
 
 ########################################################## MARINGA ##############################################################
 
@@ -116,10 +139,15 @@ code = 120
 [company.maringa.columns.pedido_em_carteira]
 code = 178
 name = "PEDIDO EM CARTEIRA"
+responsible = "andre"
 
 [company.maringa.users.andre]
 code = 4686
-name = "André Costa"
+name = "Andre"
+
+[company.maringa.users.comercial]
+code = 999
+name = "comercial"
 
 ########################################################## VENDEDORES ###########################################################
 

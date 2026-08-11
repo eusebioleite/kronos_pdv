@@ -1,42 +1,51 @@
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use sibyl::Session;
-use sqlx::any;
-
-use crate::repository::sync::Order;
+use sibyl::{Row, Session};
+use tracing::error;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Card {
     pub tipo: String,
-    pub pedido: i64,
+    pub pedido: String,
     pub indice: i64,
     pub status: String,
     pub retries: i32,
     pub last_error: Option<String>,
-    pub code: Option<String>,
+    pub code: Option<i64>,
     pub guid: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }
 
 impl Card {
-    pub fn from_row(row: &Row) -> Result<Self, Error> {
+    pub fn from_row(row: &Row<'_>) -> Result<Self> {
+        let tipo: String = row.get(0)?.unwrap_or_default();
+        let pedido: String = row.get(1)?.unwrap_or_default();
+        let indice: i64 = row.get::<_, i64>(2)?.unwrap_or_default();
+        let status: String = row.get(3)?.unwrap_or_default();
+        let retries: i32 = row.get::<_, i32>(4)?.unwrap_or(0);
+        let last_error: Option<String> = row.get(5)?;
+        let code: Option<i64> = row.get(6)?;
+        let guid: Option<String> = row.get(7)?;
+        let created_at: Option<String> = row.get(8)?;
+        let updated_at: Option<String> = row.get(9)?;
+
         Ok(Self {
-            tipo: row.get(0)?,
-            pedido: row.get(1)?,
-            indice: row.get(2)?,
-            status: row.get(3)?,
-            retries: row.get(4)?,
-            last_error: row.get(5)?,
-            code: row.get(6)?,
-            guid: row.get(7)?,
-            created_at: row.get(8)?,
-            updated_at: row.get(9)?,
+            tipo,
+            pedido,
+            indice,
+            status,
+            retries,
+            last_error,
+            code,
+            guid,
+            created_at,
+            updated_at,
         })
     }
 }
 
-pub async fn get_queue(session: &Session<'_>) -> Result<Vec<Card>, anyhow::Error> {
+pub async fn get_queue(session: &Session<'_>) -> Result<Vec<Card>> {
     let sql = "
         SELECT
             tipo,
@@ -54,15 +63,9 @@ pub async fn get_queue(session: &Session<'_>) -> Result<Vec<Card>, anyhow::Error
            OR (status = 'TRAVADO' AND updated_at < SYSTIMESTAMP - INTERVAL '15' MINUTE))
           AND retries < 5
     ";
-    let stmt = match session.prepare(sql).await {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for getting queue: {}", e);
-            anyhow::bail!("Failed to prepare statement for getting queue: {}", e);
-        }
-    
-    };
-    let rows = stmt.query(()).await?;
+
+    let stmt = session.prepare(sql).await.context("Failed to prepare statement for get_queue")?;
+    let rows = stmt.query(()).await.context("Failed to query queue from Oracle")?;
     let mut queue = Vec::new();
 
     while let Some(row) = rows.next().await? {
@@ -77,7 +80,7 @@ pub async fn update_status(
     session: &Session<'_>,
     status: &str,
     card: &Card,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     let sql = "
         UPDATE inventario.cards
         SET status = :1,
@@ -86,30 +89,18 @@ pub async fn update_status(
           AND pedido = :3
           AND indice = :4
     ";
-    let stmt = match session.prepare(sql).await {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for updating status: {}", e);
-            anyhow::bail!("Failed to execute statement for updating status: {}", e);
-        }
-    
-    };
-    let _ = match stmt.execute((status, &card.tipo, &card.pedido, &card.indice)).await {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            error!("Failed to execute statement for updating status: {}", e);
-            anyhow::bail!("Failed to execute statement for updating status: {}", e);
-        }
-    };
+    let stmt = session.prepare(sql).await.context("Failed to prepare statement for update_status")?;
+    stmt.execute((status, &card.tipo, &card.pedido, card.indice)).await.context("Failed to execute update_status")?;
+    session.commit().await.context("Failed to commit session after update_status")?;
     Ok(())
 }
 
 pub async fn update_code_guid(
     session: &Session<'_>,
-    code: &str,
+    code: i64,
     guid: &str,
     card: &Card,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     let sql = "
         UPDATE inventario.cards
         SET code = :1,
@@ -119,22 +110,9 @@ pub async fn update_code_guid(
           AND pedido = :4
           AND indice = :5
     ";
-    let stmt = match session.prepare(sql).await {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for updating code and guid: {}", e);
-            anyhow::bail!("Failed to execute statement for updating code and guid: {}", e);
-        }
-    
-    };
-    let _ = match stmt.execute((code, guid, &card.tipo, &card.pedido, &card.indice)).await {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            error!("Failed to execute statement for updating code and guid: {}", e);
-            anyhow::bail!("Failed to execute statement for updating code and guid: {}", e);
-        }
-    };
-
+    let stmt = session.prepare(sql).await.context("Failed to prepare statement for update_code_guid")?;
+    stmt.execute((code, guid, &card.tipo, &card.pedido, card.indice)).await.context("Failed to execute update_code_guid")?;
+    session.commit().await.context("Failed to commit session after update_code_guid")?;
     Ok(())
 }
 
@@ -142,7 +120,7 @@ pub async fn update_last_error(
     session: &Session<'_>,
     last_error: &str,
     card: &Card,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     let sql = "
         UPDATE inventario.cards
         SET last_error = :1,
@@ -151,30 +129,16 @@ pub async fn update_last_error(
           AND pedido = :3
           AND indice = :4
     ";
-    
-    let stmt = match session.prepare(sql).await {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for updating last_error: {}", e);
-            anyhow::bail!("Failed to execute statement for updating last_error: {}", e);
-        }
-    
-    };
-
-    let _ = match stmt.execute((last_error, &card.tipo, &card.pedido, &card.indice)).await {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            error!("Failed to execute statement for updating last_error: {}", e);
-            anyhow::bail!("Failed to execute statement for updating last_error: {}", e);
-        }
-    };
+    let stmt = session.prepare(sql).await.context("Failed to prepare statement for update_last_error")?;
+    stmt.execute((last_error, &card.tipo, &card.pedido, card.indice)).await.context("Failed to execute update_last_error")?;
+    session.commit().await.context("Failed to commit session after update_last_error")?;
     Ok(())
 }
 
 pub async fn update_retries(
     session: &Session<'_>,
     card: &Card,
-) -> Result<(), anyhow::Error> {
+) -> Result<()> {
     let sql = "
         UPDATE inventario.cards
         SET retries = retries + 1,
@@ -183,21 +147,8 @@ pub async fn update_retries(
           AND pedido = :2
           AND indice = :3
     ";
-    
-    let stmt = match session.prepare(sql).await {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for updating retries: {}", e);
-            anyhow::bail!("Failed to execute statement for updating retries: {}", e);
-        }
-    };
-
-    let _ = match stmt.execute((&card.tipo, &card.pedido, &card.indice)).await {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            error!("Failed to execute statement for updating retries: {}", e);
-            anyhow::bail!("Failed to execute statement for updating retries: {}", e);
-        }
-    };
+    let stmt = session.prepare(sql).await.context("Failed to prepare statement for update_retries")?;
+    stmt.execute((&card.tipo, &card.pedido, card.indice)).await.context("Failed to execute update_retries")?;
+    session.commit().await.context("Failed to commit session after update_retries")?;
     Ok(())
 }

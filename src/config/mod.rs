@@ -3,9 +3,6 @@ use std::collections::HashMap;
 use std::fs;
 use tracing::{error, info};
 
-mod app;
-mod company; 
-mod requester;
 
 // =====================================================================
 // ITEMS
@@ -15,6 +12,9 @@ mod requester;
 pub struct Column {
     pub code: u32,
     pub name: String,
+    pub responsible: String,
+    #[serde(default)]
+    pub product_override: HashMap<String, String>,
 }
 
 impl Column {
@@ -144,6 +144,37 @@ impl RootConfig {
 
         Ok(())
     }
+
+    pub fn get_requester_by_name(&self, name: &str) -> Option<&Requester> {
+        self.requesters.values().find(|r| r.name.trim() == name)
+    }
+
+    pub fn get_column_by_company(&self, company_code: u32, column_name: &str) -> Option<&Column> {
+        for company in self.company.values() {
+            if company.code == company_code {
+                return company.columns.values().find(|c| c.name.trim() == column_name);
+            }
+        }
+        None
+    }
+
+    pub fn get_responsible(&self, company: &Company, column: &Column, commercial: u32, tipo_produto: &str) -> u32 {
+    // 1. Verifica se existe uma regra específica para o tipo de produto
+    let user_key = if let Some(override_user) = column.product_override.get(tipo_produto) {
+        override_user
+    } else {
+        &column.responsible 
+    };
+
+    if user_key == "comercial" {
+        return commercial;
+    }
+
+    company.users.get(user_key)
+        .map(|u| u.code)
+        .unwrap_or(commercial)
+    }
+
 }
 
 // =====================================================================
@@ -195,4 +226,20 @@ pub fn init() -> Result<RootConfig, anyhow::Error> {
     }
 
     Ok(root_config)
+}
+
+
+pub fn get_config() -> Result<RootConfig, anyhow::Error> {
+    let config_path = "kronos_pdv.toml";
+
+    let config_content = match fs::read_to_string(config_path) {
+        Ok(content) => content,
+        Err(e) => anyhow::bail!("Failed to read config file '{}': {}", config_path, e),
+    };
+
+    let config: RootConfig = match toml::from_str(&config_content) {
+        Ok(c) => c,
+        Err(e) => anyhow::bail!("Failed to parse config file '{}': {}", config_path, e),
+    };
+    Ok(config)
 }

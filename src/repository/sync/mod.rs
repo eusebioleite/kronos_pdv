@@ -1,4 +1,6 @@
-use crate::repository::queue::Card;
+use sibyl::ToSql;
+
+use crate::{config::{RootConfig, get_config}, repository::queue::Card};
 
 pub struct Order {
     order_code: String,
@@ -48,7 +50,7 @@ impl Order {
     }
 }
 
-pub struct Card {
+pub struct NewCard {
     pub title: String,
     pub script: String,
     pub objective: String,
@@ -61,45 +63,80 @@ pub struct Card {
     pub detail: Vec<OrderItem>,
 }
 
-impl Card {
-    pub fn from_order(order: &Order) -> Result<Self, anyhow::Error> {
-        Ok(Self {
-            title: get_title(&order),
-            script: order.customer_fantasy.trim().to_string(),
-            objective: order.delivery_type.trim().to_string(),
-            activity_type: order.activity_type,
-            kanban: u32,
-            requester: match get_requester(order.order_seller.trim()) {
-                Ok(r) => r,
-                Err(e) => {
-                    error!("Failed to get requester: {}", e);
-                    anyhow::bail!("Failed to get requester: {}", e);
-                }
-            },
-            responsible: int,
-            planned_date: order.schedule_date,
-            replanned_date: order.schedule_date,
-            detail: Vec<OrderItem>,
-        })
+pub fn get_detail(order: &Order) -> String {
+    let mut sb = String::with_capacity(5000);
+    sb.push_str(&format!("• <b>Produto:</b> {order.product_code} | {order.product_description}<br>\n"));
+    sb.push_str("• <b>Quantidade:</b> ");
+
+    if order.product_bottle == 0 {
+        sb.push_str(&format!("{order.schedule_qtd} unidades"));
+    } else {
+        let boxes = order.schedule_qtd / order.product_bottle;
+        let leftover = order.schedule_qtd % order.product_bottle;
+        
+        if boxes == 0 {
+        sb.push_str(&format!("1 volume com {order.schedule_qtd} unidades no total volume incompleto)."));
+        } else if leftover > 0 {
+            sb.push_str(&format!("{boxes} volumes de {order.product_bottle} unidades ({order.schedule_qtd} unidades no total)."));
+        } else {
+            sb.push_str(&format!("{boxes} volumes de {order.product_bottle} unidades ({order.schedule_qtd} unidades no total)"));
+        }
     }
+    sb.push_str("<br><br>\n");
+    sb
 }
 
-pub fn get_title(order: &Order) -> String {
-    format!("PDV-{} {} | {}", order.order_kind, order.order_code.trim_start_matches('0'), order.customer_name)
+pub fn get_responsible(order: &Order) -> Result<u32, anyhow::Error> {
+    let config = match get_config() {
+        Ok(c) => c,
+        Err(e) => return Err(anyhow::anyhow!("Failed to get config: {}", e)),
+    };
+
+    let company = match config.company.values().find(|c| c.code == order.order_company) {
+        Some(c) => c,
+        None => return Err(anyhow::anyhow!("Company {} not found", order.order_company)),
+    };
+
+    let column = match company.columns.values().find(|col| col.name.trim() == "PEDIDO EM CARTEIRA") {
+        Some(col) => col,
+        None => return Err(anyhow::anyhow!("Column 'PEDIDO EM CARTEIRA' not found for company {}", order.order_company)),
+    };
+
+    let responsible = config.get_responsible(company, column, order.product_type.trim());
+
+    Ok(responsible)
+}
+
+pub fn get_kanban(order: &Order) -> Result<u32, anyhow::Error> {
+    let config = match get_config() {
+        Ok(c) => c,
+        Err(e) => return Err(anyhow::anyhow!("Failed to get config: {}", e)),
+    };
+    
+    let kanban = RootConfig::get_column_by_company(&config, order.order_company, "PEDIDO EM CARTEIRA");
+
+    match kanban {
+        Some(k) => Ok(k.code),
+        None => Err(anyhow::anyhow!("Kanban {} not found", order.order_company)),
+    }
 }
 
 pub fn get_requester(name: &str) -> Result<u32, anyhow::Error> {
-    let config = crate::config::get_config();
-    let requesters = config.get_requesters();
-    for requester in requesters {
-        if requester.name.trim() == name {
-            return Ok(requester.code);
-        }
+    let config = match get_config() {
+        Ok(c) => c,
+        Err(e) => return Err(anyhow::anyhow!("Failed to get config: {}", e)),
+    };
+
+    let requester = RootConfig::get_requester_by_name(&config, name);
+
+    match requester {
+        Some(r) => Ok(r.code),
+        None => Err(anyhow::anyhow!("Requester {} not found", name)),
     }
-    Err(anyhow::anyhow!("Requester {} not found", name))
 }
 
-pub async fn get_order(session: &Session<'_>) -> Result<Vec<Order>, anyhow::Error> {
+pub async fn get_order(session: &Session<'_>, card: &Card) -> Result<Vec<Order>, anyhow::Error> {
+    
     let sql = "
     WITH itens_do_pedido AS (
         SELECT 
@@ -164,6 +201,8 @@ pub async fn get_order(session: &Session<'_>) -> Result<Vec<Order>, anyhow::Erro
     END AS activity_type
     FROM itens_do_pedido itens
     ";
+    sql.push_str("WHERE order_code = :1");
+
     let stmt = match session.prepare(sql).await {
         Ok(s) => s,
         Err(e) => {
@@ -172,7 +211,7 @@ pub async fn get_order(session: &Session<'_>) -> Result<Vec<Order>, anyhow::Erro
         }
     
     };
-    let rows = match stmt.query(()).await {
+    let rows = match stmt.query(&card.order_code).await {
         Ok(r) => r,
         Err(e) => {
             error!("Failed to execute query for getting queue: {}", e);
@@ -201,15 +240,42 @@ pub fn fill_card_data() {
     todo!();
 }
 
+pub fn order_to_card(order: &Order) -> Result<NewCard, anyhow::Error> {
+    let type_activity = match order.product_type.as_str() {
+        "FRASCO" => match order.order_type.as_str() {
+            "AMOSTRA" => 4,
+            "TRANSF" => 7,
+            "VENDA" => 2,
+            _ => 2,
+        },
+        "PREFORMA" => match order.order_type.as_str() {
+            "AMOSTRA" => 3,
+            "TRANSF" => 6,
+            "VENDA" => 1,
+            _ => 1,
+        },
+    };
+    let title = format!("Pedido {order.order_code} - {order.customer_name}"); // titulo
+    let planned_date; // data planejada
+    let replanned_date; // data planejada
+    let final_date; // data final
+    let requester; // codigo vendedor crm
+    let responsible; // codigo responsavel coluna
+    let delivery_type; // tipo de frete
+    let script; // fantasia cliente
+    let detail; // detalhes do pedido
+    let objective; // tipo_entrga
+    let kanban; // codigo coluna
+}
 
-pub async fn process_order(session: &Session<'_>, item: &Card) -> Result<(), anyhow::Error> {
-    let order = match get_order(&session).await {
+pub async fn process_order(session: &Session<'_>, card: &Card) -> Result<(), anyhow::Error> {
+    let order = match get_order(&session, card).await {
         Ok(o) => o,
         Err(e) => {
             error!("Failed to get order: {}", e);
             anyhow::bail!("Failed to get order: {}", e);
         }
     };
-    let mut card = Card::from_order(order.first().unwrap())?;
-	return card, nil
+
+    let new_cards = order_to_card(&order)
 }
