@@ -48,6 +48,57 @@ impl Order {
     }
 }
 
+pub struct Card {
+    pub title: String,
+    pub script: String,
+    pub objective: String,
+    pub activity_type: u32,
+    pub kanban: u32,
+    pub requester: u32,
+    pub responsible: u32,
+    pub planned_date: chrono::NaiveDate,
+    pub replanned_date: chrono::NaiveDate,
+    pub detail: Vec<OrderItem>,
+}
+
+impl Card {
+    pub fn from_order(order: &Order) -> Result<Self, anyhow::Error> {
+        Ok(Self {
+            title: get_title(&order),
+            script: order.customer_fantasy.trim().to_string(),
+            objective: order.delivery_type.trim().to_string(),
+            activity_type: order.activity_type,
+            kanban: u32,
+            requester: match get_requester(order.order_seller.trim()) {
+                Ok(r) => r,
+                Err(e) => {
+                    error!("Failed to get requester: {}", e);
+                    anyhow::bail!("Failed to get requester: {}", e);
+                }
+            },
+            responsible: int,
+            planned_date: order.schedule_date,
+            replanned_date: order.schedule_date,
+            detail: Vec<OrderItem>,
+        })
+    }
+}
+
+pub fn get_title(order: &Order) -> String {
+    format!("PDV-{} {} | {}", order.order_kind, order.order_code.trim_start_matches('0'), order.customer_name)
+}
+
+pub fn get_requester(name: &str) -> Result<u32, anyhow::Error> {
+    let config = crate::config::get_config();
+    let requesters = config.get_requesters();
+    for requester in requesters {
+        if requester.name.trim() == name {
+            return Ok(requester.code);
+        }
+    }
+    Err(anyhow::anyhow!("Requester {} not found", name))
+}
+
 pub async fn get_order(session: &Session<'_>) -> Result<Vec<Order>, anyhow::Error> {
     let sql = "
     WITH itens_do_pedido AS (
@@ -150,3 +201,15 @@ pub fn fill_card_data() {
     todo!();
 }
 
+
+pub async fn process_order(session: &Session<'_>, item: &Card) -> Result<(), anyhow::Error> {
+    let order = match get_order(&session).await {
+        Ok(o) => o,
+        Err(e) => {
+            error!("Failed to get order: {}", e);
+            anyhow::bail!("Failed to get order: {}", e);
+        }
+    };
+    let mut card = Card::from_order(order.first().unwrap())?;
+	return card, nil
+}

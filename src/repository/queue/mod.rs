@@ -201,7 +201,3 @@ pub async fn update_retries(
     };
     Ok(())
 }
-
-pub async fn process_card(session: &Session<'_>, item: &Card) -> Result<(), anyhow::Error> {
-    todo!();
-}

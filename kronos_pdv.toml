@@ -9,6 +9,8 @@ client_secret = "K74VIJ6QgmqIY5IaSJ5ThjYvn2yvxbl0sinbxNyQeRX"
 context_guid = "af1a5eb4-6d54-11f0-8ce7-baccb1227f9a"
 port = 9558
 debug = true
+interval = 5
+throttle = 5
 
 ########################################################## MOGI MIRIM ###########################################################
 [company.mogi_mirim]
