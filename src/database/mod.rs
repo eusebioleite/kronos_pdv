@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 use tracing::error;
 use sibyl::{Environment, SessionPool};
 use std::env;
@@ -11,7 +11,7 @@ pub struct ConnectionInfo {
 }
 
 pub fn get_oci_env() -> Result<&'static Environment> {
-    let oracle = sibyl::env().map_err(|e| anyhow!("Failed to initialize OCI environment: {e}"))?;
+    let oracle = sibyl::env().context("Failed to initialize Oracle OCI environment")?;
     Ok(Box::leak(Box::new(oracle)))
 }
 
@@ -61,7 +61,7 @@ pub async fn init_pool(
         1,
         1,
         5,
-    ).await?;
+    ).await.with_context(|| format!("Failed to create Oracle session pool for user '{}' on db '{}'", conn_info.user, conn_info.db))?;
 
     Ok(pool)
 }

@@ -1100,6 +1100,7 @@ dependencies = [
  "async-trait",
  "axum",
  "chrono",
+ "http",
  "maud",
  "nu-ansi-term",
  "reqwest",

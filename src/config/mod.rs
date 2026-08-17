@@ -1,3 +1,4 @@
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -247,25 +248,15 @@ pub fn init() -> Result<RootConfig, anyhow::Error> {
         info!("Configuração padrão salva em {}", path.display());
     }
 
-    let config_file = fs::read_to_string(path).map_err(|e| {
-        error!("Erro ao ler arquivo de configuração: {}", e);
-        anyhow::anyhow!("Erro ao ler arquivo de configuração: {}", e)
-    })?;
+    let config_file = fs::read_to_string(path)
+        .with_context(|| format!("Erro ao ler arquivo de configuração em {}", path.display()))?;
 
-    let root_config: RootConfig = toml::from_str(&config_file).map_err(|e| {
-        error!(
-            "Erro de sintaxe ou campo obrigatório ausente no TOML: {}",
-            e
-        );
-        anyhow::anyhow!(
-            "Erro de sintaxe ou campo obrigatório ausente no TOML: {}",
-            e
-        )
-    })?;
+    let root_config: RootConfig = toml::from_str(&config_file)
+        .with_context(|| format!("Erro de sintaxe ou campo obrigatório ausente no TOML ({})", path.display()))?;
 
     if let Err(err_msg) = root_config.validate() {
         error!("Configuração inválida no arquivo TOML: {}", err_msg);
-        anyhow::bail!("Configuração inválida no arquivo TOML: {}", err_msg);
+        anyhow::bail!("Configuração inválida no arquivo TOML ({}): {}", path.display(), err_msg);
     }
 
     Ok(root_config)
@@ -274,14 +265,11 @@ pub fn init() -> Result<RootConfig, anyhow::Error> {
 pub fn get_config() -> Result<RootConfig, anyhow::Error> {
     let config_path = "kronos_pdv.toml";
 
-    let config_content = match fs::read_to_string(config_path) {
-        Ok(content) => content,
-        Err(e) => anyhow::bail!("Failed to read config file '{}': {}", config_path, e),
-    };
+    let config_content = fs::read_to_string(config_path)
+        .with_context(|| format!("Failed to read config file '{}'", config_path))?;
 
-    let config: RootConfig = match toml::from_str(&config_content) {
-        Ok(c) => c,
-        Err(e) => anyhow::bail!("Failed to parse config file '{}': {}", config_path, e),
-    };
+    let config: RootConfig = toml::from_str(&config_content)
+        .with_context(|| format!("Failed to parse TOML from config file '{}'", config_path))?;
+
     Ok(config)
 }

@@ -1,3 +1,4 @@
+use anyhow::Context;
 use tracing::{error, info};
 use std::sync::Arc;
 
@@ -16,47 +17,16 @@ async fn main() -> anyhow::Result<()> {
 
     // inicializar configuração
     info!("Loading configuration.");
-    let config = match config::init() {
-        Ok(c) => c,
-        Err(e) => {
-            error!("Failed to load configuration: {e}");
-            anyhow::bail!("Failed to load configuration: {e}");
-        }
-    };
+    let config = config::init().context("Failed to load application configuration from file")?;
 
     // inicializar banco de dados
     info!("Loading database.");
-    let env = match database::get_oci_env() {
-        Ok(env) => env,
-        Err(e) => {
-            error!("Failed to initialize OCI environment: {e}");
-            anyhow::bail!("Failed to initialize OCI environment: {e}");
-        }
-    };
+    let env = database::get_oci_env().context("Failed to initialize Oracle OCI environment")?;
+    let conn_info = database::get_conn().context("Failed to parse Oracle database connection string")?;
+    let pool = Arc::new(database::init_pool(env, &conn_info).await.context("Failed to build Oracle connection pool")?);
+    let mysql_pool = dealercrm::init_pool().await.context("Failed to build MySQL CRM connection pool")?;
 
-    let conn_info = match database::get_conn() {
-        Ok(info) => info,
-        Err(e) => {
-            error!("Failed to parse connection info: {e}");
-            anyhow::bail!("Failed to parse connection info: {e}");
-        }
-    };
-
-    let pool = match database::init_pool(env, &conn_info).await {
-        Ok(pool) => Arc::new(pool),
-        Err(e) => {
-            error!("Failed to build connection pool: {e}");
-            anyhow::bail!("Failed to build connection pool: {e}");
-        }
-    };
-
-    let mysql_pool = match dealercrm::init_pool().await {
-        Ok(pool) => pool,
-        Err(e) => {
-            error!("Failed to build CRM connection pool: {e}");
-            anyhow::bail!("Failed to build CRM connection pool: {e}");
-        }
-    };
+    let api_client = api::auth::build_api_client(Arc::new(config.config.clone()));
 
     // inicializar rotina
     info!(
@@ -100,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
         for card in queue {
             info!("Processing card pedido: {}", card.pedido);
 
-            match repository::sync::sync_queue(&session, &card, &config.config, &mysql_pool).await {
+            match repository::sync::sync_queue(&session, &card, &config.config, &mysql_pool, &api_client).await {
                 Ok(_) => {
                     info!("Card {} processed successfully.", card.pedido);
                 }

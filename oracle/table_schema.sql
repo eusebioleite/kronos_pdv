@@ -1,46 +1,50 @@
---drop table cards;
+--drop table kronos_pdv_queue;
 
-create table cards (
-   pedido     varchar2(40) not null,
-   status     varchar2(20) default 'NOVO' not null,
-   retries    number default 0 not null,
-   last_error varchar2(4000),
-   created_at date default sysdate not null,
-   updated_at date default sysdate not null,
-   constraint pk_cards primary key ( pedido )
+create table kronos_pdv_queue (
+   order_code     varchar2(40) not null,
+   schedule_code  number not null,
+   status         varchar2(20) default 'NOVO' not null,
+   retries        number default 0 not null,
+   last_error     varchar2(4000),
+   created_at     timestamp(6) default systimestamp not null,
+   updated_at     timestamp(6) default systimestamp not null,
+   constraint pk_kronos_pdv_queue primary key ( order_code, schedule_code )
 );
 
-create or replace trigger trg_cards_updated_at before
-   update on cards
+create or replace trigger trg_kronos_pdv_queue_updated_at before
+   update on kronos_pdv_queue
    for each row
 begin
-   :new.updated_at := sysdate;
+   :new.updated_at := systimestamp;
 end;
 
-comment on table cards is
-   'Fila de integração do Kronos_PDV, automação responsável por transformar pedidos de venda do Debx em cards do DealerCRM..';
+comment on table kronos_pdv_queue is
+   'Fila de integração do Kronos_PDV, automação responsável por transformar pedidos de venda do Debx em cards do DealerCRM.';
 
-comment on column cards.pedido is
+comment on column kronos_pdv_queue.order_code is
    'Código do pedido no Debx.';
 
-comment on column cards.status is
+comment on column kronos_pdv_queue.schedule_code is
+   'Código da programação no Debx.';
+
+comment on column kronos_pdv_queue.status is
    'Estado da sincronização: ATUALIZAR, NOVO, EXCLUIR, TRAVADO, SUCESSO, EXCLUIDO.';
 
-comment on column cards.retries is
+comment on column kronos_pdv_queue.retries is
    'Contador de tentativas de sincronizar, máximo de 5.';
 
-comment on column cards.last_error is
+comment on column kronos_pdv_queue.last_error is
    'Ultimo erro de sincronização.';
 
-comment on column cards.created_at is
+comment on column kronos_pdv_queue.created_at is
    'Timestamp de criação.';
 
-comment on column cards.updated_at is
+comment on column kronos_pdv_queue.updated_at is
    'Timestamp da última modificação.';
 
-create index idx_cards_status on
-   cards (
+create index idx_kronos_pdv_queue_status on
+   kronos_pdv_queue (
       status
    );
  
-grant all privileges on inventario.cards to kronos;
+grant all privileges on inventario.kronos_pdv_queue to kronos;

@@ -1,7 +1,6 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use sibyl::{Row, Session};
-use tracing::{error, info};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Queue {
@@ -15,21 +14,27 @@ pub struct Queue {
 
 impl Queue {
     pub fn from_row(row: &Row<'_>) -> Result<Self> {
-        let pedido: String = match row.get::<Option<String>, _>(0usize)? {
-            Some(s) => s,
-            None => String::new(),
-        };
-        let status: String = match row.get::<Option<String>, _>(1usize)? {
-            Some(s) => s,
-            None => String::new(),
-        };
-        let retries: i32 = match row.get::<Option<i32>, _>(2usize)? {
-            Some(r) => r,
-            None => 0,
-        };
-        let last_error: Option<String> = row.get(3usize)?;
-        let created_at: Option<String> = row.get(4usize)?;
-        let updated_at: Option<String> = row.get(5usize)?;
+        let pedido: String = row
+            .get::<Option<String>, _>(0usize)
+            .context("Failed to read 'pedido' (column 0) from row")?
+            .unwrap_or_default();
+        let status: String = row
+            .get::<Option<String>, _>(1usize)
+            .context("Failed to read 'status' (column 1) from row")?
+            .unwrap_or_default();
+        let retries: i32 = row
+            .get::<Option<i32>, _>(2usize)
+            .context("Failed to read 'retries' (column 2) from row")?
+            .unwrap_or_default();
+        let last_error: Option<String> = row
+            .get(3usize)
+            .context("Failed to read 'last_error' (column 3) from row")?;
+        let created_at: Option<String> = row
+            .get(4usize)
+            .context("Failed to read 'created_at' (column 4) from row")?;
+        let updated_at: Option<String> = row
+            .get(5usize)
+            .context("Failed to read 'updated_at' (column 5) from row")?;
 
         Ok(Self {
             pedido,
@@ -57,46 +62,25 @@ pub async fn get_queue(session: &Session<'_>) -> Result<Vec<Queue>> {
         AND retries < 5
     ";
 
-    let stmt = match session
+    let stmt = session
         .prepare(sql)
         .await
-        .context("Failed to prepare statement for get_queue")
-    {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for get_queue: {}", e);
-            return Err(anyhow!("Failed to prepare statement for get_queue: {}", e));
-        }
-    };
-    let rows = match stmt
+        .context("Failed to prepare statement for get_queue from inventario.cards")?;
+
+    let rows = stmt
         .query(())
         .await
-        .context("Failed to query queue from Oracle")
-    {
-        Ok(r) => r,
-        Err(e) => {
-            error!("Failed to query queue from Oracle: {}", e);
-            return Err(anyhow!("Failed to query queue from Oracle: {}", e));
-        }
-    };
+        .context("Failed to query queue records from Oracle inventario.cards")?;
 
     let mut queue = Vec::new();
 
-    while let Some(row) = match rows.next().await {
-        Ok(Some(r)) => Some(r),
-        Ok(None) => None,
-        Err(e) => {
-            error!("Failed to fetch row from queue: {}", e);
-            return Err(anyhow!("Failed to fetch row from queue: {}", e));
-        }
-    } {
-        let card = match Queue::from_row(&row) {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to parse row into Queue: {}", e);
-                return Err(anyhow!("Failed to parse row into Queue: {}", e));
-            }
-        };
+    while let Some(row) = rows
+        .next()
+        .await
+        .context("Failed to fetch next row from queue query")?
+    {
+        let card = Queue::from_row(&row)
+            .context("Failed to parse row into Queue model")?;
 
         queue.push(card);
     }
@@ -113,47 +97,29 @@ pub async fn update_status(session: &Session<'_>, status: &str, queue: &Queue) -
         WHERE pedido = :2
     ";
 
-    let stmt = match session
+    let stmt = session
         .prepare(sql)
         .await
-        .context("Failed to prepare statement for update_status")
-    {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for update_status: {}", e);
-            return Err(anyhow!(
-                "Failed to prepare statement for update_status: {}",
-                e
-            ));
-        }
-    };
+        .context("Failed to prepare statement for update_status on inventario.cards")?;
 
-    match stmt
-        .execute((status, &queue.pedido))
+    stmt.execute((status, &queue.pedido))
         .await
-        .context("Failed to execute update_status")
-    {
-        Ok(_) => {}
-        Err(e) => {
-            error!("Failed to execute update_status: {}", e);
-            return Err(anyhow!("Failed to execute update_status: {}", e));
-        }
-    }
+        .with_context(|| {
+            format!(
+                "Failed to execute update_status to '{}' for pedido '{}'",
+                status, queue.pedido
+            )
+        })?;
 
-    match session
+    session
         .commit()
         .await
-        .context("Failed to commit session after update_status")
-    {
-        Ok(_) => {}
-        Err(e) => {
-            error!("Failed to commit session after update_status: {}", e);
-            return Err(anyhow!(
-                "Failed to commit session after update_status: {}",
-                e
-            ));
-        }
-    }
+        .with_context(|| {
+            format!(
+                "Failed to commit session after update_status to '{}' for pedido '{}'",
+                status, queue.pedido
+            )
+        })?;
 
     Ok(())
 }
@@ -177,101 +143,29 @@ pub async fn update_last_error(
         WHERE pedido = :2
     ";
 
-    let stmt = match session
+    let stmt = session
         .prepare(sql)
         .await
-        .context("Failed to prepare statement for update_last_error")
-    {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for update_last_error: {}", e);
-            return Err(anyhow!(
-                "Failed to prepare statement for update_last_error: {}",
-                e
-            ));
-        }
-    };
+        .context("Failed to prepare statement for update_last_error on inventario.cards")?;
 
-    match stmt
-        .execute((error_msg.as_str(), queue.pedido.as_str()))
+    stmt.execute((error_msg.as_str(), queue.pedido.as_str()))
         .await
-        .context("Failed to execute update_last_error")
-    {
-        Ok(_) => {}
-        Err(e) => {
-            error!("Failed to execute update_last_error: {}", e);
-            return Err(anyhow!("Failed to execute update_last_error: {}", e));
-        }
-    }
+        .with_context(|| {
+            format!(
+                "Failed to execute update_last_error for pedido '{}'",
+                queue.pedido
+            )
+        })?;
 
-    match session
+    session
         .commit()
         .await
-        .context("Failed to commit session after update_last_error")
-    {
-        Ok(_) => {}
-        Err(e) => {
-            error!("Failed to commit session after update_last_error: {}", e);
-            return Err(anyhow!(
-                "Failed to commit session after update_last_error: {}",
-                e
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-#[allow(dead_code)]
-pub async fn update_retries(session: &Session<'_>, queue: &Queue) -> Result<()> {
-    let sql = "
-        UPDATE inventario.cards
-        SET retries = retries + 1,
-            updated_at = SYSTIMESTAMP
-        WHERE pedido = :1
-    ";
-
-    let stmt = match session
-        .prepare(sql)
-        .await
-        .context("Failed to prepare statement for update_retries")
-    {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for update_retries: {}", e);
-            return Err(anyhow!(
-                "Failed to prepare statement for update_retries: {}",
-                e
-            ));
-        }
-    };
-
-    match stmt
-        .execute(&queue.pedido)
-        .await
-        .context("Failed to execute update_retries")
-    {
-        Ok(_) => {}
-        Err(e) => {
-            error!("Failed to execute update_retries: {}", e);
-            return Err(anyhow!("Failed to execute update_retries: {}", e));
-        }
-    }
-
-    match session
-        .commit()
-        .await
-        .context("Failed to commit session after update_retries")
-    {
-        Ok(_) => {}
-        Err(e) => {
-            error!("Failed to commit session after update_retries: {}", e);
-            return Err(anyhow!(
-                "Failed to commit session after update_retries: {}",
-                e
-            ));
-        }
-    }
+        .with_context(|| {
+            format!(
+                "Failed to commit session after update_last_error for pedido '{}'",
+                queue.pedido
+            )
+        })?;
 
     Ok(())
 }

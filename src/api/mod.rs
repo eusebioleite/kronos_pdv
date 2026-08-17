@@ -1,136 +1,156 @@
 use anyhow::{Context, Result, anyhow};
-use reqwest::{Client, header};
-use serde::{Deserialize, Serialize};
+use reqwest_middleware::ClientWithMiddleware;
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::config::Config;
 
-#[derive(Debug, Deserialize)]
-pub struct TokenResponse {
-    pub access_token: String,
-    pub expires_in: u64,
-    pub token_type: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct ActivityCustomField {
-    #[serde(rename = "customFieldId")]
-    pub custom_field_id: i64,
-    pub value: Value,
-}
+pub mod auth;
 
 #[derive(Debug, Serialize)]
 pub struct ActivityComplete {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<i64>,
-    #[serde(rename = "processId")]
-    pub process_id: i64,
     pub title: String,
     pub detail: String,
-    #[serde(rename = "plannedDate")]
-    pub planned_date: String,
-    #[serde(rename = "functionalRequirements")]
+    pub code: i64,
+    pub guid: String,
+    pub type_activity_code: String,
+    pub planned_date: chrono::NaiveDate,
+    pub replanned_date: chrono::NaiveDate,
+    pub objective: String,
+    pub script: String,
     pub functional_requirements: String,
-    #[serde(rename = "requesterId")]
-    pub requester_id: i64,
-    #[serde(rename = "sellerId")]
-    pub seller_id: i64,
-    #[serde(rename = "companyId")]
-    pub company_id: i64,
-    #[serde(rename = "departmentId")]
-    pub department_id: Option<i64>,
-    #[serde(rename = "customFields")]
-    pub custom_fields: Vec<ActivityCustomField>,
+    pub workflow_stages: Vec<WorkflowStages>,
 }
 
-pub async fn get_token(config: &Config) -> Result<String> {
-    let client = Client::new();
-    let url = format!("{}/realms/dealercrm/protocol/openid-connect/token", config.auth_url);
+#[derive(Debug, Serialize)]
+pub struct WorkflowStages {
+    workflow_stages_code: i64,
+    pub code: i64,
+    pub guid: String,
+    pub order: i64,
+    pub order_to: i64,
+    pub requester_person_code: i64,
+    pub responsible_person_code: i64,
+}
 
-    let body = format!(
-        "grant_type=client_credentials&client_id={}&client_secret={}",
-        urlencoding::encode(&config.client_id),
-        urlencoding::encode(&config.client_secret)
-    );
-
-    let res = client
-        .post(&url)
-        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-        .body(body)
-        .send()
-        .await
-        .context("Failed to send token request")?;
-
-    if !res.status().is_success() {
-        let status = res.status();
-        let body = res.text().await.unwrap_or_default();
-        return Err(anyhow!("Failed to get token: HTTP {} - {}", status, body));
+impl ActivityComplete {
+    pub fn from_order(order: Order) -> Self {
+        ActivityComplete {
+            title: format!("Pedido {} - {}", order.order_code, order.order_kind),
+            detail: format!("Cliente: {} - {}", order.customer_code, order.customer_name),
+            code: order.order_code,
+            guid: order.order_code,
+            type_activity_code: order.order_code,
+            planned_date: order.order_date,
+            replanned_date: order.order_date,
+            objective: order.order_code,
+            script: order.order_code,
+            functional_requirements: order.order_code,
+            workflow_stages: vec![
+                WorkflowStages {
+                    workflow_stages_code: order.,
+                    code: order.order_code,
+                    guid: order.order_code,
+                    order: order.order_code,
+                    order_to: order.order_code,
+                    requester_person_code: order.order_code,
+                    responsible_person_code: order.order_code,
+                }
+            ],
+        }
     }
-
-    let token_res: TokenResponse = res.json().await.context("Failed to parse token response")?;
-    Ok(token_res.access_token)
 }
 
-pub async fn new_card(config: &Config, token: &str, card: &ActivityComplete) -> Result<()> {
-    let client = Client::new();
+pub async fn new_card(
+    client: &ClientWithMiddleware,
+    config: &Config,
+    card: &ActivityComplete,
+) -> Result<()> {
     let url = format!("{}/v3/works/core/activities", config.api_url);
+    let body_bytes = serde_json::to_vec(card)
+        .context("Failed to serialize ActivityComplete card to JSON payload")?;
 
     let res = client
         .post(&url)
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .header("ContextGuid", &config.context_guid)
-        .json(card)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(body_bytes)
         .send()
         .await
-        .context("Failed to send new_card request")?;
+        .with_context(|| format!("Failed to send new_card HTTP request to '{}'", url))?;
 
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
-        return Err(anyhow!("Failed to create card: HTTP {} - {}", status, body));
+        return Err(anyhow!(
+            "Failed to create card via API at '{}': HTTP {} - {}",
+            url,
+            status,
+            body
+        ));
     }
 
     Ok(())
 }
 
-pub async fn update_card(config: &Config, token: &str, code: i64, card: &ActivityComplete) -> Result<()> {
-    let client = Client::new();
+pub async fn update_card(
+    client: &ClientWithMiddleware,
+    config: &Config,
+    code: i64,
+    card: &ActivityComplete,
+) -> Result<()> {
     let url = format!("{}/v3/works/core/activities/{}", config.api_url, code);
+    let body_bytes = serde_json::to_vec(card).with_context(|| {
+        format!(
+            "Failed to serialize ActivityComplete card {} to JSON payload",
+            code
+        )
+    })?;
 
     let res = client
         .patch(&url)
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .header("ContextGuid", &config.context_guid)
-        .json(card)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .body(body_bytes)
         .send()
         .await
-        .context("Failed to send update_card request")?;
+        .with_context(|| format!("Failed to send update_card HTTP request to '{}'", url))?;
 
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
-        return Err(anyhow!("Failed to update card {}: HTTP {} - {}", code, status, body));
+        return Err(anyhow!(
+            "Failed to update card {} via API at '{}': HTTP {} - {}",
+            code,
+            url,
+            status,
+            body
+        ));
     }
 
     Ok(())
 }
 
-pub async fn delete_card(config: &Config, token: &str, code: i64) -> Result<()> {
-    let client = Client::new();
+pub async fn delete_card(client: &ClientWithMiddleware, config: &Config, code: i64) -> Result<()> {
     let url = format!("{}/v3/works/core/activities/{}", config.api_url, code);
 
     let res = client
         .delete(&url)
-        .header(header::AUTHORIZATION, format!("Bearer {}", token))
         .header("ContextGuid", &config.context_guid)
         .send()
         .await
-        .context("Failed to send delete_card request")?;
+        .with_context(|| format!("Failed to send delete_card HTTP request to '{}'", url))?;
 
     if !res.status().is_success() {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
-        return Err(anyhow!("Failed to delete card {}: HTTP {} - {}", code, status, body));
+        return Err(anyhow!(
+            "Failed to delete card {} via API at '{}': HTTP {} - {}",
+            code,
+            url,
+            status,
+            body
+        ));
     }
 
     Ok(())

@@ -63,10 +63,9 @@ where
         let cyan = Color::Cyan.normal();
 
         // Format the event fields (the message & local event variables)
-        let mut buf = String::new();
-        ctx.field_format()
-            .format_fields(Writer::new(&mut buf), event)?;
-        write!(writer, "{}", cyan.paint(buf))?;
+        write!(writer, "{}", cyan.prefix())?;
+        ctx.field_format().format_fields(writer.by_ref(), event)?;
+        write!(writer, "{}", cyan.suffix())?;
 
         writeln!(writer)
     }
