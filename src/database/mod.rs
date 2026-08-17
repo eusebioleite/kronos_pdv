@@ -1,5 +1,5 @@
-use anyhow::{anyhow, bail, Result};
-use log::error;
+use anyhow::{Result, anyhow, bail};
+use tracing::error;
 use sibyl::{Environment, SessionPool};
 use std::env;
 
@@ -7,7 +7,7 @@ use std::env;
 pub struct ConnectionInfo {
     pub user: String,
     pub password: String,
-    pub db: String, 
+    pub db: String,
 }
 
 pub fn get_oci_env() -> Result<&'static Environment> {
@@ -50,19 +50,18 @@ pub fn get_conn() -> Result<ConnectionInfo> {
     })
 }
 
-pub async fn init_pool<'a>(
-    env: &'a Environment,
+pub async fn init_pool(
+    env: &'static Environment,
     conn_info: &ConnectionInfo,
-) -> Result<SessionPool<'a>> {
-    let pool = SessionPool::builder(env)?
-        .user(&conn_info.user)
-        .password(&conn_info.password)
-        .db(&conn_info.db)
-        .min(1)
-        .max(5)
-        .inc(1)
-        .build()
-        .await?;
+) -> Result<SessionPool<'static>> {
+    let pool = env.create_session_pool(
+        &conn_info.db,
+        &conn_info.user,
+        &conn_info.password,
+        1,
+        1,
+        5,
+    ).await?;
 
     Ok(pool)
 }

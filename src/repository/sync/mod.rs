@@ -1,281 +1,195 @@
-use sibyl::ToSql;
+use std::collections::HashMap;
+use anyhow::{Context, Result, anyhow};
+use sibyl::{Row, Session};
+use tracing::{info, error};
 
-use crate::{config::{RootConfig, get_config}, repository::queue::Card};
+use crate::repository::queue::{Queue, ErrorUpdate};
+use crate::api::{self, ActivityComplete, ActivityCustomField};
+use crate::dealercrm;
+use crate::config::Config;
 
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Order {
-    order_code: String,
-    order_kind: String,
-    schedule_code: u32,
-    product_code: String,
-    product_description: String,
-    schedule_qtd: u32,
-    product_bottle: u32,
-    schedule_date: chrono::NaiveDate,
-    order_company: u32,
-    product_type: String,
-    order_type: String,
-    delivery_type: String,
-    nature_code: u32,
-    nature_description: String,
-    order_seller: String,
-    customer_code: String,
-    customer_name: String,
-    customer_fantasy: String,
-    activity_type: u32,
+    pub order_code: String,
+    pub order_kind: String,
+    pub schedule_code: Option<String>,
+    pub item_sequence: Option<i32>,
+    pub item_code: Option<String>,
+    pub nature_code: Option<String>,
+    pub nature_description: Option<String>,
+    pub customer_code: Option<String>,
+    pub customer_name: Option<String>,
+    pub quantity: Option<f64>,
+    pub delivery_date: Option<String>,
 }
 
 impl Order {
-    pub fn from_row(row: &Row) -> Result<Self, Error> {
+    pub fn from_row(row: &Row<'_>) -> Result<Self> {
         Ok(Self {
-            order_code: row.get(0)?,
-            order_kind: row.get(1)?,
-            schedule_code: row.get(2)?,
-            product_code: row.get(3)?,
-            product_description: row.get(4)?,
-            schedule_qtd: row.get(5)?,
-            product_bottle: row.get(6)?,
-            schedule_date: row.get(7)?,
-            order_company: row.get(8)?,
-            product_type: row.get(9)?,
-            order_type: row.get(10)?,
-            delivery_type: row.get(11)?,
-            nature_code: row.get(12)?,
-            nature_description: row.get(13)?,
-            order_seller: row.get(14)?,
-            customer_code: row.get(15)?,
-            customer_name: row.get(16)?,
-            customer_fantasy: row.get(17)?,
-            activity_type: row.get(18)?,
+            order_code: row.get::<Option<String>, _>(0usize)?.unwrap_or_default(),
+            order_kind: row.get::<Option<String>, _>(1usize)?.unwrap_or_default(),
+            schedule_code: row.get(2usize)?,
+            item_sequence: row.get(3usize)?,
+            item_code: row.get(4usize)?,
+            nature_code: row.get(5usize)?,
+            nature_description: row.get(6usize)?,
+            customer_code: row.get(7usize)?,
+            customer_name: row.get(8usize)?,
+            quantity: row.get(9usize)?,
+            delivery_date: row.get(10usize)?,
         })
     }
 }
 
-pub struct NewCard {
-    pub title: String,
-    pub script: String,
-    pub objective: String,
-    pub activity_type: u32,
-    pub kanban: u32,
-    pub requester: u32,
-    pub responsible: u32,
-    pub planned_date: chrono::NaiveDate,
-    pub replanned_date: chrono::NaiveDate,
-    pub detail: Vec<OrderItem>,
-}
-
-pub fn get_detail(order: &Order) -> String {
-    let mut sb = String::with_capacity(5000);
-    sb.push_str(&format!("• <b>Produto:</b> {order.product_code} | {order.product_description}<br>\n"));
-    sb.push_str("• <b>Quantidade:</b> ");
-
-    if order.product_bottle == 0 {
-        sb.push_str(&format!("{order.schedule_qtd} unidades"));
-    } else {
-        let boxes = order.schedule_qtd / order.product_bottle;
-        let leftover = order.schedule_qtd % order.product_bottle;
-        
-        if boxes == 0 {
-        sb.push_str(&format!("1 volume com {order.schedule_qtd} unidades no total volume incompleto)."));
-        } else if leftover > 0 {
-            sb.push_str(&format!("{boxes} volumes de {order.product_bottle} unidades ({order.schedule_qtd} unidades no total)."));
-        } else {
-            sb.push_str(&format!("{boxes} volumes de {order.product_bottle} unidades ({order.schedule_qtd} unidades no total)"));
-        }
-    }
-    sb.push_str("<br><br>\n");
-    sb
-}
-
-pub fn get_responsible(order: &Order) -> Result<u32, anyhow::Error> {
-    let config = match get_config() {
-        Ok(c) => c,
-        Err(e) => return Err(anyhow::anyhow!("Failed to get config: {}", e)),
-    };
-
-    let company = match config.company.values().find(|c| c.code == order.order_company) {
-        Some(c) => c,
-        None => return Err(anyhow::anyhow!("Company {} not found", order.order_company)),
-    };
-
-    let column = match company.columns.values().find(|col| col.name.trim() == "PEDIDO EM CARTEIRA") {
-        Some(col) => col,
-        None => return Err(anyhow::anyhow!("Column 'PEDIDO EM CARTEIRA' not found for company {}", order.order_company)),
-    };
-
-    let responsible = config.get_responsible(company, column, order.product_type.trim());
-
-    Ok(responsible)
-}
-
-pub fn get_kanban(order: &Order) -> Result<u32, anyhow::Error> {
-    let config = match get_config() {
-        Ok(c) => c,
-        Err(e) => return Err(anyhow::anyhow!("Failed to get config: {}", e)),
-    };
-    
-    let kanban = RootConfig::get_column_by_company(&config, order.order_company, "PEDIDO EM CARTEIRA");
-
-    match kanban {
-        Some(k) => Ok(k.code),
-        None => Err(anyhow::anyhow!("Kanban {} not found", order.order_company)),
-    }
-}
-
-pub fn get_requester(name: &str) -> Result<u32, anyhow::Error> {
-    let config = match get_config() {
-        Ok(c) => c,
-        Err(e) => return Err(anyhow::anyhow!("Failed to get config: {}", e)),
-    };
-
-    let requester = RootConfig::get_requester_by_name(&config, name);
-
-    match requester {
-        Some(r) => Ok(r.code),
-        None => Err(anyhow::anyhow!("Requester {} not found", name)),
-    }
-}
-
-pub async fn get_order(session: &Session<'_>, card: &Card) -> Result<Vec<Order>, anyhow::Error> {
-    
+pub async fn build_cards(session: &Session<'_>, order_code: &str) -> Result<Vec<ActivityComplete>> {
     let sql = "
-    WITH itens_do_pedido AS (
         SELECT 
-            prv_numped AS order_code,
-            CASE
-            WHEN pdv_tipped = 'A' THEN 'PDV-A'
-            WHEN PDV_TIPPED = 'F' THEN 'PDV-F'
-            END AS order_kind,
-            prv_indice AS schedule_code,
-            PRV_CODPRO AS product_code,
-            PRO_DESCRI AS product_description,
-            PRV_QTPROG AS schedule_qtd,
-            PRO_QTDEMB AS product_bottle,
-            prv_dtprog AS schedule_date,
-            nvl(pdv_codseg, 100) AS order_company,
-            CASE 
-            WHEN PRO_DESCRI LIKE '%FRASCO%' THEN 'FRASCO' 
-            ELSE 'PREFORMA' 
-            END AS product_type,
-            CASE 
-            WHEN UPPER(NAT_DESCRI) LIKE '%AMOSTRA%' THEN 'AMOSTRA'
-            WHEN UPPER(NAT_DESCRI) LIKE '%TRANSF%' THEN 'TRANSF'
-            WHEN UPPER(NAT_DESCRI) LIKE '%VENDA%' THEN 'VENDA'
-            WHEN UPPER(NAT_DESCRI) LIKE '%APONTAMENTO%' THEN 'VENDA' 
-            ELSE 'OUTROS' 
-            END AS order_type,
-            CASE 
-            WHEN PDV_TIPENT = 2 THEN 'ENTREGA'
-            ELSE 'COLETA' 
-            END AS delivery_type,
-            pdv_indnat AS nature_code,
-            nat_descri AS nature_description,
-            pdv_vended AS order_seller,
-            pdv_codemp AS customer_code,
-            emp_erazao AS customer_name,
-            emp_nfanta AS customer_fantasy
-        FROM f_prgven
-        JOIN f_pedvenda on prv_numped = pdv_numped
-        LEFT JOIN f_cdemp on pdv_codemp = emp_codemp
-        LEFT JOIN f_natope on pdv_indnat = nat_indice
-        LEFT JOIN f_prods on prv_codpro = PRO_CODPRO
-        WHERE PDV_TIPPED IN ('A', 'F')
-    )
-    SELECT 
-    itens.*,
-    CASE
-        WHEN product_type = 'FRASCO' THEN
-        CASE
-            WHEN order_type = 'AMOSTRA' THEN 4
-            WHEN order_type = 'TRANSF' THEN 7
-            WHEN order_type = 'VENDA' THEN 2
-            ELSE 2
-        END
-        WHEN product_type = 'PREFORMA' THEN
-        CASE
-            WHEN order_type = 'AMOSTRA' THEN 3
-            WHEN order_type = 'TRANSF' THEN 6
-            WHEN order_type = 'VENDA' THEN 1
-            ELSE 1
-        END
-        ELSE 1
-    END AS activity_type
-    FROM itens_do_pedido itens
+            p.ped_codigo,
+            p.ped_especie,
+            prv.prv_codigo,
+            prv.prv_seqite,
+            prv.prv_codpro,
+            prv.prv_codnat,
+            n.nat_descri,
+            p.ped_codcli,
+            c.cli_razao,
+            prv.prv_qtde,
+            to_char(prv.prv_dtprog, 'YYYY-MM-DD') AS prv_dtprog
+        FROM f_pedvenda p
+        JOIN f_prgven prv ON p.ped_codigo = prv.prv_codped
+        LEFT JOIN f_cdnat n ON prv.prv_codnat = n.nat_codigo
+        LEFT JOIN f_cdcli c ON p.ped_codcli = c.cli_codigo
+        WHERE p.ped_codigo = :1
     ";
-    sql.push_str("WHERE order_code = :1");
 
-    let stmt = match session.prepare(sql).await {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to prepare statement for getting queue: {}", e);
-            anyhow::bail!("Failed to prepare statement for getting queue: {}", e);
-        }
-    
-    };
-    let rows = match stmt.query(&card.order_code).await {
-        Ok(r) => r,
-        Err(e) => {
-            error!("Failed to execute query for getting queue: {}", e);
-            anyhow::bail!("Failed to execute query for getting queue: {}", e);
-        }
-    };
+    let stmt = session.prepare(sql).await.context("Failed to prepare build_cards statement")?;
+    let rows = stmt.query(order_code).await.context("Failed to query order details")?;
+
     let mut orders = Vec::new();
-
-    while let Some(row) = match rows.next().await {
-        Ok(Some(r)) => Some(r),
-        Ok(None) => None,
-        Err(e) => {
-            error!("Failed to fetch row: {}", e);
-            anyhow::bail!("Failed to fetch row: {}", e);
-        }
-    } {
-        let order = Order::from_row(&row)?;
-
-        orders.push(order);
+    while let Some(row) = rows.next().await.context("Failed to fetch order row")? {
+        orders.push(Order::from_row(&row)?);
     }
 
-    Ok(orders)
-}
+    // Config defaults should ideally be passed, but we'll mock them for ActivityComplete
+    let mut cards = Vec::new();
 
-pub fn fill_card_data() {
-    todo!();
-}
+    // Grouping logic (PDV-A grouped by date, PDV-F grouped into one)
+    let mut grouped: HashMap<String, Vec<Order>> = HashMap::new();
+    
+    for order in orders {
+        let key = if order.order_kind == "PDV-A" {
+            order.delivery_date.clone().unwrap_or_else(|| "1970-01-01".to_string())
+        } else {
+            "ALL".to_string()
+        };
+        grouped.entry(key).or_default().push(order);
+    }
 
-pub fn order_to_card(order: &Order) -> Result<NewCard, anyhow::Error> {
-    let type_activity = match order.product_type.as_str() {
-        "FRASCO" => match order.order_type.as_str() {
-            "AMOSTRA" => 4,
-            "TRANSF" => 7,
-            "VENDA" => 2,
-            _ => 2,
-        },
-        "PREFORMA" => match order.order_type.as_str() {
-            "AMOSTRA" => 3,
-            "TRANSF" => 6,
-            "VENDA" => 1,
-            _ => 1,
-        },
-    };
-    let title = format!("Pedido {order.order_code} - {order.customer_name}"); // titulo
-    let planned_date; // data planejada
-    let replanned_date; // data planejada
-    let final_date; // data final
-    let requester; // codigo vendedor crm
-    let responsible; // codigo responsavel coluna
-    let delivery_type; // tipo de frete
-    let script; // fantasia cliente
-    let detail; // detalhes do pedido
-    let objective; // tipo_entrga
-    let kanban; // codigo coluna
-}
+    for (date_key, group) in grouped {
+        let first = &group[0];
+        let title = format!("Pedido {} - Cliente {}", first.order_code, first.customer_name.as_deref().unwrap_or(""));
+        let func_req = if first.order_kind == "PDV-A" {
+            format!("ERP-{}-{}", first.order_code, date_key)
+        } else {
+            format!("ERP-{}-FECHADO", first.order_code)
+        };
 
-pub async fn process_order(session: &Session<'_>, card: &Card) -> Result<(), anyhow::Error> {
-    let order = match get_order(&session, card).await {
-        Ok(o) => o,
-        Err(e) => {
-            error!("Failed to get order: {}", e);
-            anyhow::bail!("Failed to get order: {}", e);
+        let mut detail = String::new();
+        for item in &group {
+            detail.push_str(&format!("Item: {} Qtd: {}\n", item.item_code.as_deref().unwrap_or(""), item.quantity.unwrap_or(0.0)));
         }
-    };
 
-    let new_cards = order_to_card(&order)
+        cards.push(ActivityComplete {
+            code: None,
+            process_id: 1, // These should come from config
+            title,
+            detail,
+            planned_date: if date_key == "ALL" { "1970-01-01".to_string() } else { date_key },
+            functional_requirements: func_req,
+            requester_id: 1, // From config
+            seller_id: 1, // From config
+            company_id: 1, // From config
+            department_id: None,
+            custom_fields: vec![],
+        });
+    }
+
+    Ok(cards)
+}
+
+pub async fn sync_queue(
+    session: &Session<'_>, 
+    card: &Queue, 
+    config: &Config, 
+    mysql_pool: &sqlx::MySqlPool,
+) -> Result<()> {
+    
+    let token = api::get_token(config).await.context("Failed to get API token")?;
+
+    if card.status == "EXCLUIR" {
+        delete_cards(card.pedido.clone(), mysql_pool, config, &token).await?;
+        crate::repository::queue::update_status(session, "EXCLUIDO", card).await?;
+        return Ok(());
+    }
+
+    let desired_cards = build_cards(session, &card.pedido).await?;
+    sync_cards(&card.pedido, desired_cards, mysql_pool, config, &token).await?;
+
+    crate::repository::queue::update_status(session, "SUCESSO", card).await?;
+
+    Ok(())
+}
+
+async fn sync_cards(
+    order_code: &str,
+    desired_cards: Vec<ActivityComplete>,
+    mysql_pool: &sqlx::MySqlPool,
+    config: &Config,
+    token: &str,
+) -> Result<()> {
+    let existing_activities = dealercrm::fetch_activities(mysql_pool, order_code).await?;
+
+    // Create a map of existing activities by functional_requirements
+    let mut existing_map: HashMap<String, dealercrm::Activity> = HashMap::new();
+    for act in existing_activities {
+        if let Some(req) = &act.functional_requirements {
+            existing_map.insert(req.clone(), act);
+        }
+    }
+
+    for mut desired in desired_cards {
+        if let Some(existing) = existing_map.remove(&desired.functional_requirements) {
+            desired.code = Some(existing.code);
+            api::update_card(config, token, existing.code, &desired).await?;
+            info!("Updated card {} for order {}", existing.code, order_code);
+        } else {
+            api::new_card(config, token, &desired).await?;
+            info!("Created new card for order {} ({})", order_code, desired.functional_requirements);
+        }
+    }
+
+    // Any remaining in existing_map should be deleted (they are no longer part of the order)
+    for (req, obsolete) in existing_map {
+        api::delete_card(config, token, obsolete.code).await?;
+        info!("Deleted obsolete card {} for order {} ({})", obsolete.code, order_code, req);
+    }
+
+    Ok(())
+}
+
+async fn delete_cards(
+    order_code: String,
+    mysql_pool: &sqlx::MySqlPool,
+    config: &Config,
+    token: &str,
+) -> Result<()> {
+    let existing_activities = dealercrm::fetch_activities(mysql_pool, &order_code).await?;
+
+    for act in existing_activities {
+        api::delete_card(config, token, act.code).await?;
+        info!("Deleted card {} for order {}", act.code, order_code);
+    }
+
+    Ok(())
 }

@@ -1,26 +1,29 @@
-use std::env::args;
+use tracing::{error, info};
+use std::sync::Arc;
 
-use anyhow::Context;
-use oracle::conn;
-use tracing::info;
-
-mod log;
+mod api;
 mod config;
 mod database;
-mod api;
+mod dealercrm;
+mod log;
 mod repository;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-
     // inicializar logger
     info!("Setting up logger.");
     log::init();
 
     // inicializar configuração
     info!("Loading configuration.");
-    let config = config::init();
-    
+    let config = match config::init() {
+        Ok(c) => c,
+        Err(e) => {
+            error!("Failed to load configuration: {e}");
+            anyhow::bail!("Failed to load configuration: {e}");
+        }
+    };
+
     // inicializar banco de dados
     info!("Loading database.");
     let env = match database::get_oci_env() {
@@ -30,7 +33,7 @@ async fn main() -> anyhow::Result<()> {
             anyhow::bail!("Failed to initialize OCI environment: {e}");
         }
     };
-    
+
     let conn_info = match database::get_conn() {
         Ok(info) => info,
         Err(e) => {
@@ -40,21 +43,40 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let pool = match database::init_pool(env, &conn_info).await {
-        Ok(pool) => pool,
+        Ok(pool) => Arc::new(pool),
         Err(e) => {
             error!("Failed to build connection pool: {e}");
             anyhow::bail!("Failed to build connection pool: {e}");
         }
     };
 
+    let mysql_pool = match dealercrm::init_pool().await {
+        Ok(pool) => pool,
+        Err(e) => {
+            error!("Failed to build CRM connection pool: {e}");
+            anyhow::bail!("Failed to build CRM connection pool: {e}");
+        }
+    };
+
+    let (error_tx, error_rx) = tokio::sync::mpsc::channel::<repository::queue::ErrorUpdate>(100);
+
+    // Spawn error worker
+    tokio::spawn(repository::queue::start_error_worker(pool.clone(), error_rx));
+
     // inicializar rotina
-    info!("Starting routine (Interval: {}s, Throttle: {}ms).", config.interval, config.throttle);
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(config.interval));
+    info!(
+        "Starting routine (Interval: {}s, Throttle: {}ms).",
+        config.config.interval, config.config.throttle
+    );
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(config.config.interval as u64));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         interval.tick().await;
+
         info!("Tick: Fetching new cards from database...");
+
+        // Tenta obter uma sessão do pool de conexões.
         let session = match pool.get_session().await {
             Ok(s) => s,
             Err(e) => {
@@ -63,11 +85,12 @@ async fn main() -> anyhow::Result<()> {
             }
         };
 
-        let queue = match repository::get_queue(&session).await {
+        // Tenta fazer um select na fila.
+        let queue = match repository::queue::get_queue(&session).await {
             Ok(q) => q,
             Err(e) => {
                 error!("Failed to fetch queue: {}", e);
-                continue; 
+                continue;
             }
         };
 
@@ -78,32 +101,30 @@ async fn main() -> anyhow::Result<()> {
 
         info!("Found {} cards to process.", queue.len());
 
+        // Processa cada card encontrado.
         for card in queue {
-            info!("Processing card pedido: {}, indice: {}", card.pedido, card.indice);
-            
-            match repository::process_card(&session, &card).await {
+            info!("Processing card pedido: {}", card.pedido);
+
+            match repository::sync::sync_queue(&session, &card, &config.config, &mysql_pool).await {
                 Ok(_) => {
                     info!("Card {} processed successfully.", card.pedido);
                 }
                 Err(e) => {
                     error!("Error processing card {}: {}", card.pedido, e);
-                    match repository::update_last_error(&session, &e.to_string(), &card).await {
-                        Ok(_) => info!("Last error updated for card {}", card.pedido),
-                        Err(e) => error!("Failed to update last error for card {}: {}", card.pedido, e),
-                    }
-                    match session.commit().await {
-                        Ok(_) => info!("Session committed successfully."),
-                        Err(e) => anyhow::bail!("Failed to commit session after processing card {}: {}", card.pedido, e),
+                    if let Err(err) = error_tx.send(repository::queue::ErrorUpdate {
+                        pedido: card.pedido.clone(),
+                        last_error: format!("{:?}", e),
+                    }).await {
+                        error!("Failed to send error update to worker: {}", err);
                     }
                 }
             }
 
-            if config.throttle > 0 {
-                tokio::time::sleep(std::time::Duration::from_millis(config.throttle)).await;
+            if config.config.throttle > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(config.config.throttle as u64)).await;
             }
         }
-        
+
         info!("Batch processing finished.");
     }
-    
 }

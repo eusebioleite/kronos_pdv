@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::fs;
 use tracing::{error, info};
 
-
 // =====================================================================
 // ITEMS
 // =====================================================================
@@ -20,7 +19,10 @@ pub struct Column {
 impl Column {
     pub fn validate(&self, path: &str) -> Result<(), String> {
         if self.name.trim().is_empty() {
-            return Err(format!("O 'name' na coluna [{}] não pode estar vazio.", path));
+            return Err(format!(
+                "O 'name' na coluna [{}] não pode estar vazio.",
+                path
+            ));
         }
         Ok(())
     }
@@ -29,13 +31,16 @@ impl Column {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct User {
     pub code: u32,
-    pub name: String, 
+    pub name: String,
 }
 
 impl User {
     pub fn validate(&self, path: &str) -> Result<(), String> {
         if self.name.trim().is_empty() {
-            return Err(format!("O 'name' no usuário [{}] não pode estar vazio.", path));
+            return Err(format!(
+                "O 'name' no usuário [{}] não pode estar vazio.",
+                path
+            ));
         }
         Ok(())
     }
@@ -50,7 +55,10 @@ pub struct Requester {
 impl Requester {
     pub fn validate(&self, path: &str) -> Result<(), String> {
         if self.name.trim().is_empty() {
-            return Err(format!("O 'name' no vendedor/requester [{}] não pode estar vazio.", path));
+            return Err(format!(
+                "O 'name' no vendedor/requester [{}] não pode estar vazio.",
+                path
+            ));
         }
         Ok(())
     }
@@ -72,7 +80,10 @@ pub struct Company {
 impl Company {
     pub fn validate(&self, location_name: &str) -> Result<(), String> {
         if self.code == 0 {
-            return Err(format!("O 'code' da filial [company.{}] não pode ser 0.", location_name));
+            return Err(format!(
+                "O 'code' da filial [company.{}] não pode ser 0.",
+                location_name
+            ));
         }
 
         for (column_key, column_info) in &self.columns {
@@ -105,13 +116,27 @@ pub struct Config {
 
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
-        if self.auth_url.trim().is_empty() { return Err("O campo '[config].auth_url' não pode estar vazio.".into()); }
-        if self.api_url.trim().is_empty() { return Err("O campo '[config].api_url' não pode estar vazio.".into()); }
-        if self.crm_url.trim().is_empty() { return Err("O campo '[config].crm_url' não pode estar vazio.".into()); }
-        if self.client_id.trim().is_empty() { return Err("O campo '[config].client_id' não pode estar vazio.".into()); }
-        if self.client_secret.trim().is_empty() { return Err("O campo '[config].client_secret' não pode estar vazio.".into()); }
-        if self.context_guid.trim().is_empty() { return Err("O campo '[config].context_guid' não pode estar vazio.".into()); }
-        if self.port == 0 { return Err("A porta '[config].port' deve ser maior que 0.".into()); }
+        if self.auth_url.trim().is_empty() {
+            return Err("O campo '[config].auth_url' não pode estar vazio.".into());
+        }
+        if self.api_url.trim().is_empty() {
+            return Err("O campo '[config].api_url' não pode estar vazio.".into());
+        }
+        if self.crm_url.trim().is_empty() {
+            return Err("O campo '[config].crm_url' não pode estar vazio.".into());
+        }
+        if self.client_id.trim().is_empty() {
+            return Err("O campo '[config].client_id' não pode estar vazio.".into());
+        }
+        if self.client_secret.trim().is_empty() {
+            return Err("O campo '[config].client_secret' não pode estar vazio.".into());
+        }
+        if self.context_guid.trim().is_empty() {
+            return Err("O campo '[config].context_guid' não pode estar vazio.".into());
+        }
+        if self.port == 0 {
+            return Err("A porta '[config].port' deve ser maior que 0.".into());
+        }
         Ok(())
     }
 }
@@ -152,29 +177,39 @@ impl RootConfig {
     pub fn get_column_by_company(&self, company_code: u32, column_name: &str) -> Option<&Column> {
         for company in self.company.values() {
             if company.code == company_code {
-                return company.columns.values().find(|c| c.name.trim() == column_name);
+                return company
+                    .columns
+                    .values()
+                    .find(|c| c.name.trim() == column_name);
             }
         }
         None
     }
 
-    pub fn get_responsible(&self, company: &Company, column: &Column, commercial: u32, tipo_produto: &str) -> u32 {
-    // 1. Verifica se existe uma regra específica para o tipo de produto
-    let user_key = if let Some(override_user) = column.product_override.get(tipo_produto) {
-        override_user
-    } else {
-        &column.responsible 
-    };
+    pub fn get_responsible(
+        &self,
+        company: &Company,
+        column: &Column,
+        commercial: u32,
+        tipo_produto: &str,
+    ) -> u32 {
+        // 1. Verifica se existe uma regra específica para o tipo de produto
+        let user_key = if let Some(override_user) = column.product_override.get(tipo_produto) {
+            override_user
+        } else {
+            &column.responsible
+        };
 
-    if user_key == "comercial" {
-        return commercial;
+        if user_key == "comercial" {
+            return commercial;
+        }
+
+        company
+            .users
+            .get(user_key)
+            .map(|u| u.code)
+            .unwrap_or(commercial)
     }
-
-    company.users.get(user_key)
-        .map(|u| u.code)
-        .unwrap_or(commercial)
-    }
-
 }
 
 // =====================================================================
@@ -186,7 +221,9 @@ pub fn init() -> Result<RootConfig, anyhow::Error> {
 
     let default_root = RootConfig {
         config: Config {
-            auth_url: String::from("https://auth.dolphinsistemas.com.br/realms/dealercrm/protocol/openid-connect/token"),
+            auth_url: String::from(
+                "https://auth.dolphinsistemas.com.br/realms/dealercrm/protocol/openid-connect/token",
+            ),
             api_url: String::from("https://api-treino-kronospet.dealercrm.com.br"),
             crm_url: String::from("https://treino-kronospet.dealercrm.com.br"),
             client_id: String::from("treino-kronospet-1778695296950"),
@@ -197,7 +234,7 @@ pub fn init() -> Result<RootConfig, anyhow::Error> {
             interval: 5,
             debug: true,
         },
-        company: HashMap::new(), 
+        company: HashMap::new(),
         requesters: HashMap::new(),
     };
 
@@ -212,22 +249,27 @@ pub fn init() -> Result<RootConfig, anyhow::Error> {
 
     let config_file = fs::read_to_string(path).map_err(|e| {
         error!("Erro ao ler arquivo de configuração: {}", e);
-        anyhow::bail!("Erro ao ler arquivo de configuração: {}", e)
+        anyhow::anyhow!("Erro ao ler arquivo de configuração: {}", e)
     })?;
 
     let root_config: RootConfig = toml::from_str(&config_file).map_err(|e| {
-        error!("Erro de sintaxe ou campo obrigatório ausente no TOML: {}", e);
-        anyhow::bail!("Erro de sintaxe ou campo obrigatório ausente no TOML: {}", e)
+        error!(
+            "Erro de sintaxe ou campo obrigatório ausente no TOML: {}",
+            e
+        );
+        anyhow::anyhow!(
+            "Erro de sintaxe ou campo obrigatório ausente no TOML: {}",
+            e
+        )
     })?;
 
     if let Err(err_msg) = root_config.validate() {
         error!("Configuração inválida no arquivo TOML: {}", err_msg);
-        return anyhow::bail!("Configuração inválida no arquivo TOML: {}", err_msg);
+        anyhow::bail!("Configuração inválida no arquivo TOML: {}", err_msg);
     }
 
     Ok(root_config)
 }
-
 
 pub fn get_config() -> Result<RootConfig, anyhow::Error> {
     let config_path = "kronos_pdv.toml";

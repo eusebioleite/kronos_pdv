@@ -1,0 +1,3 @@
+[env]
+OCI_LIB_DIR = "d:\\oracle\\instantclient_23_0\\sdk\\lib\\msvc"
+ORACLE_HOME = "d:\\oracle\\instantclient_23_0"
