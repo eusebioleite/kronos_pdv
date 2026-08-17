@@ -3,7 +3,7 @@ use anyhow::{Context, Result, anyhow};
 use sibyl::{Row, Session};
 use tracing::{info, error};
 
-use crate::repository::queue::{Queue, ErrorUpdate};
+use crate::repository::queue::Queue;
 use crate::api::{self, ActivityComplete, ActivityCustomField};
 use crate::dealercrm;
 use crate::config::Config;

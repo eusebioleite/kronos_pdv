@@ -13,12 +13,6 @@ pub struct Queue {
     pub updated_at: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-pub struct ErrorUpdate {
-    pub pedido: String,
-    pub last_error: String,
-}
-
 impl Queue {
     pub fn from_row(row: &Row<'_>) -> Result<Self> {
         let pedido: String = match row.get::<Option<String>, _>(0usize)? {
@@ -164,53 +158,68 @@ pub async fn update_status(session: &Session<'_>, status: &str, queue: &Queue) -
     Ok(())
 }
 
-pub async fn start_error_worker(
-    pool: std::sync::Arc<sibyl::SessionPool<'static>>,
-    mut rx: tokio::sync::mpsc::Receiver<ErrorUpdate>,
-) {
-    while let Some(update) = rx.recv().await {
-        let session = match pool.get_session().await {
-            Ok(s) => s,
-            Err(e) => {
-                error!("Worker: Failed to get session from pool for error update: {:?}", e);
-                continue;
-            }
-        };
-
-        let mut error_msg = update.last_error;
-        if error_msg.len() > 32000 {
-            error_msg.truncate(32000);
-        }
-
-        let sql = "
-            UPDATE inventario.cards
-            SET 
-                last_error = :1,
-                retries = retries + 1,
-                updated_at = SYSTIMESTAMP
-            WHERE pedido = :2
-        ";
-
-        let stmt = match session.prepare(sql).await {
-            Ok(s) => s,
-            Err(e) => {
-                error!("Worker: Failed to prepare statement for update_last_error: {:?}", e);
-                continue;
-            }
-        };
-
-        if let Err(e) = stmt.execute((error_msg.as_str(), update.pedido.as_str())).await {
-            error!("Worker: Failed to execute update_last_error: {:?}", e);
-            continue;
-        }
-
-        if let Err(e) = session.commit().await {
-            error!("Worker: Failed to commit session after update_last_error: {:?}", e);
-            continue;
-        }
-
-        info!("Worker: Last error updated for card {}", update.pedido);
+pub async fn update_last_error(
+    session: &Session<'_>,
+    last_error: &str,
+    queue: &Queue,
+) -> Result<()> {
+    let mut error_msg = last_error.to_string();
+    if error_msg.len() > 4000 {
+        error_msg.truncate(4000);
     }
+
+    let sql = "
+        UPDATE inventario.cards
+        SET 
+            last_error = :1,
+            retries = retries + 1,
+            updated_at = SYSTIMESTAMP
+        WHERE pedido = :2
+    ";
+
+    let stmt = match session
+        .prepare(sql)
+        .await
+        .context("Failed to prepare statement for update_last_error")
+    {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to prepare statement for update_last_error: {}", e);
+            return Err(anyhow!(
+                "Failed to prepare statement for update_last_error: {}",
+                e
+            ));
+        }
+    };
+
+    match stmt
+        .execute((error_msg.as_str(), queue.pedido.as_str()))
+        .await
+        .context("Failed to execute update_last_error")
+    {
+        Ok(_) => {}
+        Err(e) => {
+            error!("Failed to execute update_last_error: {}", e);
+            return Err(anyhow!("Failed to execute update_last_error: {}", e));
+        }
+    }
+
+    match session
+        .commit()
+        .await
+        .context("Failed to commit session after update_last_error")
+    {
+        Ok(_) => {}
+        Err(e) => {
+            error!("Failed to commit session after update_last_error: {}", e);
+            return Err(anyhow!(
+                "Failed to commit session after update_last_error: {}",
+                e
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 #[allow(dead_code)]

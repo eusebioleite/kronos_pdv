@@ -4,7 +4,7 @@ create table cards (
    pedido     varchar2(40) not null,
    status     varchar2(20) default 'NOVO' not null,
    retries    number default 0 not null,
-   last_error varchar2(32767),
+   last_error varchar2(4000),
    created_at date default sysdate not null,
    updated_at date default sysdate not null,
    constraint pk_cards primary key ( pedido )

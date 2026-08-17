@@ -58,11 +58,6 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let (error_tx, error_rx) = tokio::sync::mpsc::channel::<repository::queue::ErrorUpdate>(100);
-
-    // Spawn error worker
-    tokio::spawn(repository::queue::start_error_worker(pool.clone(), error_rx));
-
     // inicializar rotina
     info!(
         "Starting routine (Interval: {}s, Throttle: {}ms).",
@@ -111,11 +106,12 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Err(e) => {
                     error!("Error processing card {}: {}", card.pedido, e);
-                    if let Err(err) = error_tx.send(repository::queue::ErrorUpdate {
-                        pedido: card.pedido.clone(),
-                        last_error: format!("{:?}", e),
-                    }).await {
-                        error!("Failed to send error update to worker: {}", err);
+                    match repository::queue::update_last_error(&session, &e.to_string(), &card).await {
+                        Ok(_) => info!("Last error updated for card {}", card.pedido),
+                        Err(err) => error!(
+                            "Failed to update last error for card {}: {}",
+                            card.pedido, err
+                        ),
                     }
                 }
             }
