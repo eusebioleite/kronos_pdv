@@ -9,6 +9,7 @@ use chrono::{DateTime, Duration, Utc};
 use crate::config::Config;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct TokenResponse {
     pub access_token: String,
     pub expires_in: u64,
@@ -51,14 +52,14 @@ impl AuthManager {
         // 2. Need to refresh or get new token. Get write lock.
         let mut state = state_lock.write().await;
         // Double-check in case another task refreshed it while we were waiting
-        if let Some(token) = state.as_ref() {
-            if token.expires_at > Utc::now() + Duration::try_seconds(30).unwrap_or_default() {
-                return Ok(token.access_token.clone());
-            }
+        if let Some(token) = state.as_ref()
+            && token.expires_at > Utc::now() + Duration::try_seconds(30).unwrap_or_default()
+        {
+            return Ok(token.access_token.clone());
         }
 
         // 3. Fetch new token
-        let url = format!("{}/realms/dealercrm/protocol/openid-connect/token", self.config.auth_url);
+        let url = self.config.auth_url.clone();
         
         let body = format!(
             "grant_type=client_credentials&client_id={}&client_secret={}",
@@ -134,12 +135,27 @@ impl Middleware for AuthMiddleware {
     }
 }
 
-pub fn build_api_client(config: Arc<Config>) -> reqwest_middleware::ClientWithMiddleware {
+static API_CLIENT: OnceLock<reqwest_middleware::ClientWithMiddleware> = OnceLock::new();
+
+/// Returns a reference to the global authenticated HTTP client.
+/// Panics if called before `api::auth::init()`.
+pub fn get_client() -> &'static reqwest_middleware::ClientWithMiddleware {
+    API_CLIENT.get().expect("api::auth::init() must be called before get_client()")
+}
+
+/// Initializes the global API client. Must be called once at startup,
+/// after `config::init()`.
+pub fn init() {
+    let client = build_api_client();
+    API_CLIENT.set(client).ok(); // Silently ignore if called twice
+}
+
+fn build_api_client() -> reqwest_middleware::ClientWithMiddleware {
     let reqwest_client = Client::builder()
         .build()
         .expect("Failed to build reqwest client");
 
-    let auth_manager = AuthManager::new(config);
+    let auth_manager = AuthManager::new(Arc::new(crate::config::get().config.clone()));
 
     reqwest_middleware::ClientBuilder::new(reqwest_client)
         .with(AuthMiddleware { manager: auth_manager })

@@ -1,76 +1,63 @@
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
-use sibyl::{Row, Session};
+use sibyl::Row;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use crate::database;
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Queue {
-    pub pedido: String,
-    pub status: String,
+    pub order_code: String,
     pub retries: i32,
-    pub last_error: Option<String>,
-    pub created_at: Option<String>,
-    pub updated_at: Option<String>,
+    pub error: Option<String>,
 }
 
 impl Queue {
     pub fn from_row(row: &Row<'_>) -> Result<Self> {
-        let pedido: String = row
+        let order_code: String = row
             .get::<Option<String>, _>(0usize)
-            .context("Failed to read 'pedido' (column 0) from row")?
-            .unwrap_or_default();
-        let status: String = row
-            .get::<Option<String>, _>(1usize)
-            .context("Failed to read 'status' (column 1) from row")?
+            .context("Failed to read 'order_code' (column 0) from row")?
             .unwrap_or_default();
         let retries: i32 = row
-            .get::<Option<i32>, _>(2usize)
-            .context("Failed to read 'retries' (column 2) from row")?
+            .get::<Option<i32>, _>(1usize)
+            .context("Failed to read 'retries' (column 1) from row")?
             .unwrap_or_default();
-        let last_error: Option<String> = row
-            .get(3usize)
-            .context("Failed to read 'last_error' (column 3) from row")?;
-        let created_at: Option<String> = row
-            .get(4usize)
-            .context("Failed to read 'created_at' (column 4) from row")?;
-        let updated_at: Option<String> = row
-            .get(5usize)
-            .context("Failed to read 'updated_at' (column 5) from row")?;
+        let error: Option<String> = row
+            .get(2usize)
+            .context("Failed to read 'error' (column 2) from row")?;
 
         Ok(Self {
-            pedido,
-            status,
+            order_code,
             retries,
-            last_error,
-            created_at,
-            updated_at,
+            error,
         })
     }
 }
 
-pub async fn get_queue(session: &Session<'_>) -> Result<Vec<Queue>> {
+pub async fn get_queue() -> Result<Vec<Queue>> {
+    let session = database::get_pool()
+        .get_session()
+        .await
+        .context("Failed to get session from pool.")?;
+
     let sql = "
         SELECT
-            pedido,
-            status,
+            order_code,
             retries,
-            last_error,
-            to_char(created_at, 'YYYY-MM-DD HH24:MI:SS') AS created_at,
-            to_char(updated_at, 'YYYY-MM-DD HH24:MI:SS') AS updated_at
-        FROM inventario.cards
-        WHERE (status IN ('NOVO', 'ATUALIZAR', 'EXCLUIR')
-        OR (status = 'TRAVADO' AND updated_at < SYSTIMESTAMP - INTERVAL '15' MINUTE))
-        AND retries < 5
+            TO_CHAR(error) AS error
+        FROM kronos_pdv_queue
+        WHERE sync = 1
+        ORDER BY updated_at
     ";
 
     let stmt = session
         .prepare(sql)
         .await
-        .context("Failed to prepare statement for get_queue from inventario.cards")?;
+        .context("Failed to prepare get_queue statement for kronos_pdv_queue")?;
 
     let rows = stmt
         .query(())
         .await
-        .context("Failed to query queue records from Oracle inventario.cards")?;
+        .context("Failed to query queue records from Oracle kronos_pdv_queue")?;
 
     let mut queue = Vec::new();
 
@@ -79,93 +66,77 @@ pub async fn get_queue(session: &Session<'_>) -> Result<Vec<Queue>> {
         .await
         .context("Failed to fetch next row from queue query")?
     {
-        let card = Queue::from_row(&row)
-            .context("Failed to parse row into Queue model")?;
-
+        let card = Queue::from_row(&row).context("Failed to parse row into Queue model")?;
         queue.push(card);
     }
 
     Ok(queue)
 }
 
-pub async fn update_status(session: &Session<'_>, status: &str, queue: &Queue) -> Result<()> {
+pub async fn mark_sync(order_code: &str) -> Result<()> {
+    let session = database::get_pool()
+        .get_session()
+        .await
+        .context("Failed to get session from pool.")?;
+
     let sql = "
-        UPDATE inventario.cards
+        UPDATE kronos_pdv_queue
         SET 
-            status = :1,
+            sync = 0,
+            retries = 0,
             updated_at = SYSTIMESTAMP
-        WHERE pedido = :2
+        WHERE order_code = :1
     ";
 
     let stmt = session
         .prepare(sql)
         .await
-        .context("Failed to prepare statement for update_status on inventario.cards")?;
+        .context("Failed to prepare statement for mark_synced on kronos_pdv_queue")?;
 
-    stmt.execute((status, &queue.pedido))
+    stmt.execute(order_code)
         .await
-        .with_context(|| {
-            format!(
-                "Failed to execute update_status to '{}' for pedido '{}'",
-                status, queue.pedido
-            )
-        })?;
+        .with_context(|| format!("Failed to execute mark_synced for order_code '{order_code}'"))?;
 
-    session
-        .commit()
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to commit session after update_status to '{}' for pedido '{}'",
-                status, queue.pedido
-            )
-        })?;
+    session.commit().await.with_context(|| {
+        format!("Failed to commit session after mark_synced for order_code '{order_code}'")
+    })?;
 
     Ok(())
 }
 
-pub async fn update_last_error(
-    session: &Session<'_>,
-    last_error: &str,
-    queue: &Queue,
-) -> Result<()> {
+pub async fn update_error(order_code: &str, last_error: &str) -> Result<()> {
+    let session = database::get_pool()
+        .get_session()
+        .await
+        .context("Failed to get session from pool.")?;
+
     let mut error_msg = last_error.to_string();
-    if error_msg.len() > 4000 {
-        error_msg.truncate(4000);
+    if error_msg.len() > 3990 {
+        error_msg.truncate(3990);
+        error_msg.push_str("...");
     }
 
     let sql = "
-        UPDATE inventario.cards
+        UPDATE kronos_pdv_queue
         SET 
-            last_error = :1,
+            error = json_transform(COALESCE(error, '[]'), APPEND '$' = json_scalar(:1)),
             retries = retries + 1,
             updated_at = SYSTIMESTAMP
-        WHERE pedido = :2
+        WHERE order_code = :2
     ";
 
     let stmt = session
         .prepare(sql)
         .await
-        .context("Failed to prepare statement for update_last_error on inventario.cards")?;
+        .context("Failed to prepare statement for update_error on kronos_pdv_queue")?;
 
-    stmt.execute((error_msg.as_str(), queue.pedido.as_str()))
+    stmt.execute((error_msg.as_str(), order_code))
         .await
-        .with_context(|| {
-            format!(
-                "Failed to execute update_last_error for pedido '{}'",
-                queue.pedido
-            )
-        })?;
+        .with_context(|| format!("Failed to execute update_error for order_code '{order_code}'"))?;
 
-    session
-        .commit()
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to commit session after update_last_error for pedido '{}'",
-                queue.pedido
-            )
-        })?;
+    session.commit().await.with_context(|| {
+        format!("Failed to commit session after update_error for order_code '{order_code}'")
+    })?;
 
     Ok(())
 }

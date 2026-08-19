@@ -1,3 +1,24 @@
+########################################################## OLD .ENV #############################################################
+
+# CORE
+#AUTH_URL="https://auth.dolphinsistemas.com.br/realms/dealercrm/protocol/openid-connect/token"
+#INTERVAL=1
+#THROTTLE=0
+
+# PRODUÇÃO #
+#CONTEXT_GUID="230c9229-6d54-11f0-9e58-c695cae6e357"
+#CLIENT_ID="kronospet-auth-1761226113054"
+#CLIENT_SECRET="l_Y-pWvi1seJ0Q-n3xI6Evh7fJT5cmJdmrO8PIdXq0t"
+#API_URL="https://api-kronospet.dealercrm.com.br"
+#CRM_URL="https://kronospet.dealercrm.com.br"
+
+# TREINO #
+#CONTEXT_GUID="af1a5eb4-6d54-11f0-8ce7-baccb1227f9a"
+#CLIENT_ID="treino-kronospet-1778695296950"
+#CLIENT_SECRET="K74VIJ6QgmqIY5IaSJ5ThjYvn2yvxbl0sinbxNyQeRX"
+#API_URL="https://api-treino-kronospet.dealercrm.com.br"
+#CRM_URL="https://treino-kronospet.dealercrm.com.br"
+
 ########################################################## APP CONFIG ###########################################################
 
 [config]
@@ -7,77 +28,89 @@ crm_url = "https://treino-kronospet.dealercrm.com.br"
 client_id = "treino-kronospet-1778695296950"
 client_secret = "K74VIJ6QgmqIY5IaSJ5ThjYvn2yvxbl0sinbxNyQeRX"
 context_guid = "af1a5eb4-6d54-11f0-8ce7-baccb1227f9a"
-port = 9558
-debug = true
 interval = 5
 throttle = 5
+
+[config.mysql]
+user = "eusebio"
+password = "4kH@0go0j!DvracO"
+host = "177.70.19.93"
+port = "30108"
+database = "Dealer_Kronospet_Treino"
+
+[config.oracle]
+user = "KRONOS"
+password = "LARANJA"
+host = "172.20.92.10"
+port = "1521"
+database = "TESTE"
 
 ########################################################## MOGI MIRIM ###########################################################
 [company.mogi_mirim]
 code = 100
 
 [company.mogi_mirim.columns.pedido_em_carteira]
-code = 46
+code = 211
 name = "PEDIDO EM CARTEIRA"
 responsible = "paulo"
 
 [company.mogi_mirim.columns.producao]
-code = 1
+code = 205
 name = "PRODUCAO"
 responsible = "paulo"
 
 [company.mogi_mirim.columns.empenho]
-code = 48
+code = 212
 name = "EMPENHO"
 responsible = "comercial"
 
 [company.mogi_mirim.columns.ordem_separacao]
-code = 25
+code = 209
 name = "ORDEM SEPARACAO"
 responsible = "felipe"
 
 [company.mogi_mirim.columns.separacao]
-code = 26
+code = 210
 name = "SEPARACAO"
 responsible = "felipe"
 
 [company.mogi_mirim.columns.faturamento]
-code = 4
+code = 206
 name = "FATURAMENTO"
 responsible = "cristiane"
 
 [company.mogi_mirim.columns.qualidade]
-code = 98
+code = 215
 name = "QUALIDADE"
 responsible = "maria"
 
 [company.mogi_mirim.columns.coleta]
-code = 155
+code = 216
 name = "COLETA"
 responsible = "diego"
 
 [company.mogi_mirim.columns.carregamento]
-code = 65
+code = 214
 name = "CARREGAMENTO"
 responsible = "diego"
 
 [company.mogi_mirim.columns.em_transito]
-code = 49
+code = 213
 name = "EM TRANSITO"
 responsible = "diego"
 
 [company.mogi_mirim.columns.canhoto]
-code = 183
+code = 217
 name = "CANHOTO"
 responsible = "diego"
 
 [company.mogi_mirim.columns.pedido_cancelado]
-code = 9
+code = 208
 name = "PEDIDO CANCELADO"
 responsible = "comercial"
 
 [company.mogi_mirim.columns.finalizado]
-code = 8
+code = 207
 name = "FINALIZADO"
 responsible = "comercial"
 

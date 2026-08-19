@@ -1,3 +1,6 @@
 [env]
 OCI_LIB_DIR = "d:\\oracle\\instantclient_23_0\\sdk\\lib\\msvc"
 ORACLE_HOME = "d:\\oracle\\instantclient_23_0"
+
+[target.'cfg(all(windows, target_env = "msvc"))']
+rustflags = ["-L", "native=d:\\oracle\\instantclient_23_0\\sdk\\lib\\msvc"]

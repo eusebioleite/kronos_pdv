@@ -1,6 +1,5 @@
 use anyhow::Context;
 use tracing::{error, info};
-use std::sync::Arc;
 
 mod api;
 mod config;
@@ -12,46 +11,41 @@ mod repository;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // inicializar logger
+    let _log_guard = log::init();
     info!("Setting up logger.");
-    log::init();
 
     // inicializar configuração
     info!("Loading configuration.");
-    let config = config::init().context("Failed to load application configuration from file")?;
+    config::init().context("Failed to load application configuration from file")?;
 
     // inicializar banco de dados
     info!("Loading database.");
-    let env = database::get_oci_env().context("Failed to initialize Oracle OCI environment")?;
-    let conn_info = database::get_conn().context("Failed to parse Oracle database connection string")?;
-    let pool = Arc::new(database::init_pool(env, &conn_info).await.context("Failed to build Oracle connection pool")?);
-    let mysql_pool = dealercrm::init_pool().await.context("Failed to build MySQL CRM connection pool")?;
+    database::init_pool()
+        .await
+        .context("Failed to build Oracle connection pool")?;
 
-    let api_client = api::auth::build_api_client(Arc::new(config.config.clone()));
+    dealercrm::init_pool()
+        .await
+        .context("Failed to build MySQL CRM connection pool")?;
+
+    api::auth::init();
 
     // inicializar rotina
     info!(
         "Starting routine (Interval: {}s, Throttle: {}ms).",
-        config.config.interval, config.config.throttle
+        config::get().config.interval,
+        config::get().config.throttle
     );
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(config.config.interval as u64));
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+        config::get().config.interval as u64,
+    ));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     loop {
         interval.tick().await;
 
-        info!("Tick: Fetching new cards from database...");
-
-        // Tenta obter uma sessão do pool de conexões.
-        let session = match pool.get_session().await {
-            Ok(s) => s,
-            Err(e) => {
-                error!("Failed to get session from pool: {}", e);
-                continue;
-            }
-        };
-
         // Tenta fazer um select na fila.
-        let queue = match repository::queue::get_queue(&session).await {
+        let queue = match repository::queue::get_queue().await {
             Ok(q) => q,
             Err(e) => {
                 error!("Failed to fetch queue: {}", e);
@@ -60,34 +54,36 @@ async fn main() -> anyhow::Result<()> {
         };
 
         if queue.is_empty() {
-            info!("No cards to process. Waiting for next tick.");
             continue;
         }
 
-        info!("Found {} cards to process.", queue.len());
+        info!("Found {} items to process.", queue.len());
 
         // Processa cada card encontrado.
-        for card in queue {
-            info!("Processing card pedido: {}", card.pedido);
+        for item in queue {
+            info!("Processing item: {}", item.order_code);
 
-            match repository::sync::sync_queue(&session, &card, &config.config, &mysql_pool, &api_client).await {
+            match repository::sync::sync_queue(&item).await {
                 Ok(_) => {
-                    info!("Card {} processed successfully.", card.pedido);
+                    info!("Item {} processed successfully.", item.order_code);
                 }
                 Err(e) => {
-                    error!("Error processing card {}: {}", card.pedido, e);
-                    match repository::queue::update_last_error(&session, &e.to_string(), &card).await {
-                        Ok(_) => info!("Last error updated for card {}", card.pedido),
+                    error!("Error processing item {}: {:#}", item.order_code, e);
+                    match repository::queue::update_error(&item.order_code, &e.to_string()).await {
+                        Ok(_) => info!("Last error updated for order {}", item.order_code),
                         Err(err) => error!(
-                            "Failed to update last error for card {}: {}",
-                            card.pedido, err
+                            "Failed to update last error for order {}: {}",
+                            item.order_code, err
                         ),
                     }
                 }
             }
 
-            if config.config.throttle > 0 {
-                tokio::time::sleep(std::time::Duration::from_millis(config.config.throttle as u64)).await;
+            if config::get().config.throttle > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(
+                    config::get().config.throttle as u64,
+                ))
+                .await;
             }
         }
 

@@ -1,67 +1,42 @@
-use anyhow::{Context, Result, bail};
-use tracing::error;
-use sibyl::{Environment, SessionPool};
-use std::env;
+use anyhow::{Context, Result};
+use sibyl::SessionPool;
+use std::sync::OnceLock;
 
-#[derive(Debug, Clone)]
-pub struct ConnectionInfo {
-    pub user: String,
-    pub password: String,
-    pub db: String,
+static ORACLE_POOL: OnceLock<SessionPool<'static>> = OnceLock::new();
+
+pub async fn init_pool() -> Result<()> {
+    let env = match sibyl::env() {
+        Ok(env) => Box::leak(Box::new(env)),
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "Failed to initialize Oracle OCI environment: {}",
+                e
+            ));
+        }
+    };
+
+    let cfg = &crate::config::get().config.oracle;
+    let db = format!("{}:{}/{}", cfg.host, cfg.port, cfg.database);
+
+    let pool = env
+        .create_session_pool(&db, &cfg.user, &cfg.password, 1, 1, 5)
+        .await
+        .with_context(|| {
+            format!(
+                "Failed to create Oracle session pool for user '{}' on '{}:{}/{}'",
+                cfg.user, cfg.host, cfg.port, cfg.database
+            )
+        })?;
+
+    ORACLE_POOL
+        .set(pool)
+        .map_err(|_| anyhow::anyhow!("database::init_pool() was called more than once"))?;
+
+    Ok(())
 }
 
-pub fn get_oci_env() -> Result<&'static Environment> {
-    let oracle = sibyl::env().context("Failed to initialize Oracle OCI environment")?;
-    Ok(Box::leak(Box::new(oracle)))
-}
-
-pub fn get_conn() -> Result<ConnectionInfo> {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        error!("Forneça a string de conexão USUARIO/SENHA@HOST:PORT/SERVICO");
-        bail!("Forneça a string de conexão USUARIO/SENHA@HOST:PORT/SERVICO");
-    }
-    let conn_str = &args[1];
-
-    let parts: Vec<&str> = conn_str.splitn(2, '@').collect();
-    if parts.len() != 2 {
-        error!("Formato esperado: USUARIO/SENHA@HOST:PORT/SERVICO");
-        bail!("Formato esperado: USUARIO/SENHA@HOST:PORT/SERVICO");
-    }
-
-    let creds = parts[0];
-    let db = parts[1];
-
-    let user_pass: Vec<&str> = creds.splitn(2, '/').collect();
-    if user_pass.len() != 2 {
-        error!("Formato de credenciais esperado: USUARIO/SENHA");
-        bail!("Formato de credenciais esperado: USUARIO/SENHA");
-    }
-
-    if !db.contains(':') || !db.contains('/') {
-        error!("Formato de rede esperado: HOST:PORT/SERVICO");
-        bail!("Formato de rede esperado: HOST:PORT/SERVICO");
-    }
-
-    Ok(ConnectionInfo {
-        user: user_pass[0].to_string(),
-        password: user_pass[1].to_string(),
-        db: db.to_string(),
-    })
-}
-
-pub async fn init_pool(
-    env: &'static Environment,
-    conn_info: &ConnectionInfo,
-) -> Result<SessionPool<'static>> {
-    let pool = env.create_session_pool(
-        &conn_info.db,
-        &conn_info.user,
-        &conn_info.password,
-        1,
-        1,
-        5,
-    ).await.with_context(|| format!("Failed to create Oracle session pool for user '{}' on db '{}'", conn_info.user, conn_info.db))?;
-
-    Ok(pool)
+pub fn get_pool() -> &'static SessionPool<'static> {
+    ORACLE_POOL
+        .get()
+        .expect("database::init_pool() must be called before get_pool()")
 }

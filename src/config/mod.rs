@@ -2,6 +2,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
+use std::sync::OnceLock;
 use tracing::{error, info};
 
 // =====================================================================
@@ -20,10 +21,7 @@ pub struct Column {
 impl Column {
     pub fn validate(&self, path: &str) -> Result<(), String> {
         if self.name.trim().is_empty() {
-            return Err(format!(
-                "O 'name' na coluna [{}] não pode estar vazio.",
-                path
-            ));
+            return Err(format!("The 'name' in [column.{}] cannot be empty.", path));
         }
         Ok(())
     }
@@ -38,10 +36,7 @@ pub struct User {
 impl User {
     pub fn validate(&self, path: &str) -> Result<(), String> {
         if self.name.trim().is_empty() {
-            return Err(format!(
-                "O 'name' no usuário [{}] não pode estar vazio.",
-                path
-            ));
+            return Err(format!("The 'name' in [user.{}] cannot be empty.", path));
         }
         Ok(())
     }
@@ -57,7 +52,7 @@ impl Requester {
     pub fn validate(&self, path: &str) -> Result<(), String> {
         if self.name.trim().is_empty() {
             return Err(format!(
-                "O 'name' no vendedor/requester [{}] não pode estar vazio.",
+                "The 'name' in [requester.{}] cannot be empty.",
                 path
             ));
         }
@@ -82,7 +77,7 @@ impl Company {
     pub fn validate(&self, location_name: &str) -> Result<(), String> {
         if self.code == 0 {
             return Err(format!(
-                "O 'code' da filial [company.{}] não pode ser 0.",
+                "The 'code' in [company.{}] cannot be 0.",
                 location_name
             ));
         }
@@ -102,6 +97,35 @@ impl Company {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DbConfig {
+    pub user: String,
+    pub password: String,
+    pub host: String,
+    pub port: String,
+    pub database: String,
+}
+
+impl DbConfig {
+    pub fn validate(&self, label: &str) -> Result<(), String> {
+        for (field, value) in [
+            ("user", &self.user),
+            ("password", &self.password),
+            ("host", &self.host),
+            ("port", &self.port),
+            ("database", &self.database),
+        ] {
+            if value.trim().is_empty() {
+                return Err(format!(
+                    "The field '[config.{}].{}' cannot be empty.",
+                    label, field
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub auth_url: String,
     pub throttle: u16,
@@ -111,33 +135,32 @@ pub struct Config {
     pub client_id: String,
     pub client_secret: String,
     pub context_guid: String,
-    pub port: u16,
-    pub debug: bool,
+    pub mysql: DbConfig,
+    pub oracle: DbConfig,
 }
 
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
         if self.auth_url.trim().is_empty() {
-            return Err("O campo '[config].auth_url' não pode estar vazio.".into());
+            return Err("The field '[config].auth_url' cannot be empty.".into());
         }
         if self.api_url.trim().is_empty() {
-            return Err("O campo '[config].api_url' não pode estar vazio.".into());
+            return Err("The field '[config].api_url' cannot be empty.".into());
         }
         if self.crm_url.trim().is_empty() {
-            return Err("O campo '[config].crm_url' não pode estar vazio.".into());
+            return Err("The field '[config].crm_url' cannot be empty.".into());
         }
         if self.client_id.trim().is_empty() {
-            return Err("O campo '[config].client_id' não pode estar vazio.".into());
+            return Err("The field '[config].client_id' cannot be empty.".into());
         }
         if self.client_secret.trim().is_empty() {
-            return Err("O campo '[config].client_secret' não pode estar vazio.".into());
+            return Err("The field '[config].client_secret' cannot be empty.".into());
         }
         if self.context_guid.trim().is_empty() {
-            return Err("O campo '[config].context_guid' não pode estar vazio.".into());
+            return Err("The field '[config].context_guid' cannot be empty.".into());
         }
-        if self.port == 0 {
-            return Err("A porta '[config].port' deve ser maior que 0.".into());
-        }
+        self.mysql.validate("mysql")?;
+        self.oracle.validate("oracle")?;
         Ok(())
     }
 }
@@ -155,6 +178,7 @@ pub struct RootConfig {
     pub requesters: HashMap<String, Requester>,
 }
 
+#[allow(dead_code)]
 impl RootConfig {
     pub fn validate(&self) -> Result<(), String> {
         self.config.validate()?;
@@ -171,8 +195,14 @@ impl RootConfig {
         Ok(())
     }
 
+    pub fn default_requester_code(&self) -> u32 {
+        self.requesters.get("default").map(|r| r.code).unwrap_or(0)
+    }
+
     pub fn get_requester_by_name(&self, name: &str) -> Option<&Requester> {
-        self.requesters.values().find(|r| r.name.trim() == name)
+        self.requesters
+            .values()
+            .find(|r| r.name.trim().eq_ignore_ascii_case(name))
     }
 
     pub fn get_column_by_company(&self, company_code: u32, column_name: &str) -> Option<&Column> {
@@ -181,7 +211,7 @@ impl RootConfig {
                 return company
                     .columns
                     .values()
-                    .find(|c| c.name.trim() == column_name);
+                    .find(|c| c.name.trim().eq_ignore_ascii_case(column_name));
             }
         }
         None
@@ -214,62 +244,59 @@ impl RootConfig {
 }
 
 // =====================================================================
+// GLOBAL SINGLETON
+// =====================================================================
+
+/// Process-wide config instance. Populated once by `init()` at startup.
+static CONFIG: OnceLock<RootConfig> = OnceLock::new();
+
+/// Returns a reference to the global config.
+/// Panics if called before `init()`.
+pub fn get() -> &'static RootConfig {
+    CONFIG
+        .get()
+        .expect("config::init() must be called before config::get()")
+}
+
+// =====================================================================
 // FUNÇÃO DE INICIALIZAÇÃO
 // =====================================================================
 
-pub fn init() -> Result<RootConfig, anyhow::Error> {
+pub fn init() -> anyhow::Result<()> {
     let path = std::path::Path::new("kronos_pdv.toml");
 
-    let default_root = RootConfig {
-        config: Config {
-            auth_url: String::from(
-                "https://auth.dolphinsistemas.com.br/realms/dealercrm/protocol/openid-connect/token",
-            ),
-            api_url: String::from("https://api-treino-kronospet.dealercrm.com.br"),
-            crm_url: String::from("https://treino-kronospet.dealercrm.com.br"),
-            client_id: String::from("treino-kronospet-1778695296950"),
-            client_secret: String::from("K74VIJ6QgmqIY5IaSJ5ThjYvn2yvxbl0sinbxNyQeRX"),
-            context_guid: String::from("af1a5eb4-6d54-11f0-8ce7-baccb1227f9a"),
-            port: 9558,
-            throttle: 1,
-            interval: 5,
-            debug: true,
-        },
-        company: HashMap::new(),
-        requesters: HashMap::new(),
-    };
-
-    if path.is_file() {
-        info!("Arquivo de configuração encontrado em {}", path.display());
-    } else {
-        info!("Arquivo de configuração não encontrado. Criando um novo.");
-        let toml_string = toml::to_string_pretty(&default_root)?;
-        fs::write(path, toml_string)?;
-        info!("Configuração padrão salva em {}", path.display());
+    if !path.is_file() {
+        anyhow::bail!(
+            "Config file not found in '{}'. Create the file with the credentials before starting.",
+            path.display()
+        );
     }
+
+    info!("Config file found in {}", path.display());
 
     let config_file = fs::read_to_string(path)
-        .with_context(|| format!("Erro ao ler arquivo de configuração em {}", path.display()))?;
+        .with_context(|| format!("Error reading config file in {}", path.display()))?;
 
-    let root_config: RootConfig = toml::from_str(&config_file)
-        .with_context(|| format!("Erro de sintaxe ou campo obrigatório ausente no TOML ({})", path.display()))?;
+    let root_config: RootConfig = toml::from_str(&config_file).with_context(|| {
+        format!(
+            "Syntax error or missing required field in TOML ({})",
+            path.display()
+        )
+    })?;
 
     if let Err(err_msg) = root_config.validate() {
-        error!("Configuração inválida no arquivo TOML: {}", err_msg);
-        anyhow::bail!("Configuração inválida no arquivo TOML ({}): {}", path.display(), err_msg);
+        error!("Invalid config in TOML file: {}", err_msg);
+        anyhow::bail!(
+            "Invalid config in TOML file ({}): {}",
+            path.display(),
+            err_msg
+        );
     }
 
-    Ok(root_config)
-}
+    // Store in the global singleton. Fails only if called twice.
+    CONFIG
+        .set(root_config)
+        .map_err(|_| anyhow::anyhow!("config::init() was called more than once"))?;
 
-pub fn get_config() -> Result<RootConfig, anyhow::Error> {
-    let config_path = "kronos_pdv.toml";
-
-    let config_content = fs::read_to_string(config_path)
-        .with_context(|| format!("Failed to read config file '{}'", config_path))?;
-
-    let config: RootConfig = toml::from_str(&config_content)
-        .with_context(|| format!("Failed to parse TOML from config file '{}'", config_path))?;
-
-    Ok(config)
+    Ok(())
 }

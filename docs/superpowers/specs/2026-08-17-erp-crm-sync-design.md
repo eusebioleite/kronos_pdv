@@ -2,7 +2,7 @@
 
 ## Contexto
 
-O sistema kronos_pdv sincroniza pedidos de venda do Oracle ERP para o DealerCRM via API HTTP. A sincronizacao e orientada a eventos: uma trigger no Oracle (na tabela de programacoes) registra o order_code afetado em uma fila (inventario.cards). O Rust le essa fila periodicamente e reconcilia o estado do CRM com o estado atual do Oracle.
+O sistema kronos_pdv sincroniza pedidos de venda do Oracle ERP para o DealerCRM via API HTTP. A sincronizacao e orientada a eventos: uma trigger no Oracle (na tabela de programacoes) registra o order_code afetado em uma fila (cards). O Rust le essa fila periodicamente e reconcilia o estado do CRM com o estado atual do Oracle.
 
 ## Decisoes de Design
 
@@ -49,4 +49,4 @@ Trigger em f_prgven (INSERT/UPDATE/DELETE) escreve order_code na fila com status
 | api::mod             | Novo ActivityCreate (POST) e ActivityUpdate (PATCH parcial sem coluna) |
 | dealercrm::mod       | Adicionar ActivityBusinessRule; query LIKE 'ERP-{order_code}-%'        |
 | repository::queue    | Simplificar: apenas status SINCRONIZAR                                  |
-| Oracle Trigger       | Unica trigger em f_prgven -> SINCRONIZAR em inventario.cards           |
+| Oracle Trigger       | Unica trigger em f_prgven -> SINCRONIZAR em cards           |

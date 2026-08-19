@@ -1,0 +1,2835 @@
+openapi: 3.0.0
+info:
+  title: "Core"
+  description: "Endpoints do NÃºcleo do MÃ³dulo de Trabalhos "
+  version: "20260813120639"
+servers:
+  - url: https://localhost:8082/DealerJenkins/v3/works/core
+paths:
+  /Services/v3/Work/APIs/Core/gxobject:
+    post:
+      tags:
+        - Services.v3.Work.APIs
+      operationId: "UploadServices.v3.Work.APIs.Core"
+      summary: "Upload a binary for Core"
+      responses:
+        200:
+          description: "Successful operation"
+        400:
+          description: "Bad request"
+        500:
+          description: "Internal Server Error"
+
+  /activities:
+    get:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.activities"
+      summary: "activities"
+      parameters:
+        - name: "Occurrencecode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Activityclosed"
+          in: "query"
+          required: false
+          schema:
+            type: "boolean"
+            
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CRUD.Work.Core.Engine.Responses_Activity_Activity"  
+
+        404:
+          description: "Not found"
+
+
+    patch:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.PartialUpdateActivity"
+      summary: "PartialUpdateActivity"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartialUpdateActivityInput"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Services.Core.ResponseAPI"  
+
+        404:
+          description: "Not found"
+
+
+    put:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.UpdateActivity"
+      summary: "UpdateActivity"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateActivityInput"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Services.Core.ResponseAPI"  
+
+        404:
+          description: "Not found"
+
+
+    post:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.InsertActivity"
+      summary: "InsertActivity"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InsertActivityInput"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Services.Core.ResponseAPI"  
+
+        404:
+          description: "Not found"
+
+  /activities/{Guid}:
+    get:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.Get_Activity"
+      summary: "Get_Activity"
+      parameters:
+        - name: "Guid"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            format: "uuid"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete"  
+
+        404:
+          description: "Not found"
+
+
+    delete:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.DeleteActivity"
+      summary: "DeleteActivity"
+      parameters:
+        - name: "Guid"
+          in: "path"
+          required: true
+          schema:
+            type: "string"
+            format: "uuid"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Services.Core.ResponseAPI"  
+
+        404:
+          description: "Not found"
+  /activitiesPosition:
+    post:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.PositionActivities"
+      summary: "PositionActivities"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PositionActivitiesInput"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Services.Core.ResponseAPI"  
+
+        404:
+          description: "Not found"
+
+  /kanban:
+    get:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.kanban"
+      summary: "kanban"
+      parameters:
+        - name: "Typeauditcode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Releasecode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Customercode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Projectcode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Workflowcode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Occurrencecode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Activityclosed"
+          in: "query"
+          required: false
+          schema:
+            type: "boolean"
+            
+        - name: "Activityarchived"
+          in: "query"
+          required: false
+          schema:
+            type: "boolean"
+            
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CRUD.SAC.Occurrence.Core.Handmade.Kanban_Column"  
+
+        404:
+          description: "Not found"
+
+  /genericKanban:
+    get:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.genericKanban"
+      summary: "genericKanban"
+      parameters:
+        - name: "Typeauditcode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Releasecode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Customercode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Projectcode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Workflowcodes"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Occurrencecode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Activityclosed"
+          in: "query"
+          required: false
+          schema:
+            type: "boolean"
+            
+        - name: "Activityarchived"
+          in: "query"
+          required: false
+          schema:
+            type: "boolean"
+            
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CRUD.SAC.Occurrence.Core.Handmade.Kanban_Column"  
+
+        404:
+          description: "Not found"
+
+  /infoKanban:
+    get:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.infoKanban"
+      summary: "infoKanban"
+      parameters:
+        - name: "Workflowcode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Workflowstagescode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CRUD.SAC.Occurrence.Core.Handmade.Kanban_Column"  
+
+        404:
+          description: "Not found"
+
+  /kanbanOrder:
+    get:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.OrderKanban"
+      summary: "OrderKanban"
+      parameters:
+        - name: "Stepordercode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Ordersearchnumber"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Issuestartdate"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            format: "date-time"
+        - name: "Issueenddate"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            format: "date-time"
+        - name: "Forecastclosingstartdate"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            format: "date"
+        - name: "Forecastclosingenddate"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            format: "date"
+        - name: "Deliverystartdate"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            format: "date"
+        - name: "Deliveryenddate"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            format: "date"
+        - name: "Traderepresentatives"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Steps"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Customers"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Carriers"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Funnelratings"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Pendingreview"
+          in: "query"
+          required: false
+          schema:
+            type: "boolean"
+            
+        - name: "Classificationintegration"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+        - name: "Corporatedivisioncode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Situations"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CRUD.SAC.Occurrence.Core.Handmade.Kanban_Column"  
+
+        404:
+          description: "Not found"
+
+  /timeNotes:
+    get:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.timeNotes"
+      summary: "timeNotes"
+      parameters:
+        - name: "Activitycode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Collaboratorcode"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int64"
+        - name: "Activitytimenotestart"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            format: "date-time"
+        - name: "Activitytimenoteend"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            format: "date-time"
+        - name: "Activitytimenotestatus"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int32"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CRUD.Work.Core.Handmade.Response_CollaboratorActivityTimeNote"  
+
+        404:
+          description: "Not found"
+
+
+    patch:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.UpdateColoboratorAcitivyTimeNote"
+      summary: "UpdateColoboratorAcitivyTimeNote"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateColoboratorAcitivyTimeNoteInput"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CRUD.Work.Core.Handmade.Response_CollaboratorActivityTimeNote"  
+
+        404:
+          description: "Not found"
+
+  /transferActivity:
+    post:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.TransferActivity"
+      summary: "TransferActivity"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferActivityInput"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Services.Core.ResponseAPI"  
+
+        404:
+          description: "Not found"
+
+  /activityHistory:
+    get:
+      tags:
+        - Services.v3.Work.APIs  
+      operationId: "Services.v3.Work.APIs.Core.ActivityHistory"
+      summary: "ActivityHistory"
+      parameters:
+        - name: "Activityguid"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            format: "uuid"
+      
+      responses:
+        200:
+          description: "Successful operation"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete"  
+
+        404:
+          description: "Not found"
+
+components:
+  schemas:
+    PartialUpdateActivityInput:  
+      properties:
+        ActivityComplete:
+          description: "Activity Complete"
+          $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete"
+
+    UpdateActivityInput:  
+      properties:
+        ActivityComplete:
+          description: "Activity Complete"
+          $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete"
+
+    InsertActivityInput:  
+      properties:
+        ActivityComplete:
+          description: "Activity Complete"
+          $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete"
+
+
+
+    PositionActivitiesInput:  
+      properties:
+        Guid:
+          type: "string"
+          format: "uuid"
+        NewWorkflowStagesCode:
+          type: "integer"
+          format: "int64"
+        OldWorkflowStagesCode:
+          type: "integer"
+          format: "int64"
+        Order:
+          type: "integer"
+          format: "int32"
+        OrderTo:
+          type: "integer"
+          format: "int32"
+
+
+
+
+
+
+    UpdateColoboratorAcitivyTimeNoteInput:  
+      properties:
+        ActivityTimeNoteCompleteIn:
+          description: "Activity Time Note Complete In"
+          $ref: "#/components/schemas/CRUDv4.Work.React.Handmade.ActivityTimeNoteCompleteIn"
+
+    TransferActivityInput:  
+      properties:
+        TransferActivities:
+          description: "Transfer Activities"
+          $ref: "#/components/schemas/CRUD.Work.Core.Handmade.TransferActivities"
+
+  
+    CRUD.Work.Core.Engine.Responses_Activity_Activity:
+      properties:
+        ActionPlanCode:
+          description: "Activity_ActionPlanCode"
+          type: "integer"
+          format: "int64"
+        Activity_ActionPlanCode:
+          description: "Activity_ActionPlanCode"
+          type: "integer"
+          format: "int64"
+        ActivityArchived:
+          description: "Activity_ActivityArchived"
+          type: "boolean"
+        ActivityClosed:
+          description: "Activity_ActivityClosed"
+          type: "boolean"
+        ActivityDateClosed:
+          description: "Activity_ActivityDateClosed"
+          type: "string"
+          format: "date-time"
+        ActivityFailed:
+          description: "Activity_ActivityFailed"
+          type: "boolean"
+        CancellationDate:
+          description: "Activity_CancellationDate"
+          type: "string"
+          format: "date"
+        Code:
+          description: "Activity_Code"
+          type: "integer"
+          format: "int64"
+        CompletionLevel:
+          description: "Activity_CompletionLevel"
+          type: "integer"
+          format: "int32"
+        Complexity:
+          description: "Activity_Complexity"
+          type: "integer"
+          format: "int32"
+        CorrectiveAction:
+          description: "Activity_CorrectiveAction"
+          type: "string"
+        Deadline:
+          description: "Activity_Deadline"
+          type: "string"
+          format: "date-time"
+        DescriptionForRelease:
+          description: "Activity_DescriptionForRelease"
+          type: "string"
+        Detail:
+          description: "Activity_Detail"
+          type: "string"
+        DetailForRelease:
+          description: "Activity_DetailForRelease"
+          type: "string"
+        EndTime:
+          description: "Activity_EndTime"
+          type: "string"
+          format: "date-time"
+        EpicCode:
+          description: "Activity_EpicCode"
+          type: "integer"
+          format: "int64"
+        Activity_EpicCode:
+          description: "Activity_EpicCode"
+          type: "integer"
+          format: "int64"
+        EstimatedTimeExecution:
+          description: "Activity_EstimatedTimeExecution"
+          type: "integer"
+          format: "int64"
+        EstimatedTimeReview:
+          description: "Activity_EstimatedTimeReview"
+          type: "integer"
+          format: "int64"
+        EstimatedTimeTesting:
+          description: "Activity_EstimatedTimeTesting"
+          type: "integer"
+          format: "int64"
+        Filed:
+          description: "Activity_Filed"
+          type: "boolean"
+        FocusFactoryCode:
+          description: "Activity_FocusFactoryCode"
+          type: "integer"
+          format: "int64"
+        Activity_FocusFactoryCode:
+          description: "Activity_FocusFactoryCode"
+          type: "integer"
+          format: "int64"
+        Guid:
+          description: "Activity_Guid"
+          type: "string"
+          format: "uuid"
+        ImplementedDate:
+          description: "Activity_ImplementedDate"
+          type: "string"
+          format: "date"
+        IsModel:
+          description: "Activity_IsModel"
+          type: "boolean"
+        IsOnline:
+          description: "Activity_IsOnline"
+          type: "boolean"
+        IssueCode:
+          description: "Activity_IssueCode"
+          type: "integer"
+          format: "int64"
+        Activity_IssueCode:
+          description: "Activity_IssueCode"
+          type: "integer"
+          format: "int64"
+        Level:
+          description: "Activity_Level"
+          type: "integer"
+          format: "int32"
+        Link:
+          description: "Activity_Link"
+          type: "string"
+        OccurrenceCausesCode:
+          description: "Activity_OccurrenceCausesCode"
+          type: "integer"
+          format: "int64"
+        Activity_OccurrenceCausesCode:
+          description: "Activity_OccurrenceCausesCode"
+          type: "integer"
+          format: "int64"
+        OccurrenceCode:
+          description: "Activity_OccurrenceCode"
+          type: "integer"
+          format: "int64"
+        Activity_OccurrenceCode:
+          description: "Activity_OccurrenceCode"
+          type: "integer"
+          format: "int64"
+        Outsourced:
+          description: "Activity_Outsourced"
+          type: "boolean"
+        ParentCode:
+          description: "Activity_ParentCode"
+          type: "integer"
+          format: "int64"
+        ParentDescription:
+          description: "Activity_ParentCode"
+          type: "string"
+        PlannedDate:
+          description: "Activity_PlannedDate"
+          type: "string"
+          format: "date"
+        Priority:
+          description: "Activity_Priority"
+          type: "integer"
+          format: "int32"
+        Private:
+          description: "Activity_Private"
+          type: "boolean"
+        Problem:
+          description: "Activity_Problem"
+          type: "string"
+        RequiresAttachment:
+          description: "Requer Anexo"
+          type: "boolean"
+        ProjectCode:
+          description: "Activity_ProjectCode"
+          type: "integer"
+          format: "int64"
+        ProjectName:
+          description: "Nome do Projeto"
+          type: "string"
+        Activity_ProjectCode:
+          description: "Activity_ProjectCode"
+          type: "integer"
+          format: "int64"
+        ReasonCancellation:
+          description: "Activity_ReasonCancellation"
+          type: "string"
+        ReasonDate:
+          description: "Activity_ReasonDate"
+          type: "string"
+          format: "date"
+        ReasonRefusal:
+          description: "Activity_ReasonRefusal"
+          type: "string"
+        ReplannedDate:
+          description: "Activity_ReplannedDate"
+          type: "string"
+          format: "date"
+        Script:
+          description: "Activity_Script"
+          type: "string"
+        SectorCode:
+          description: "Activity_SectorCode"
+          type: "integer"
+          format: "int64"
+        SectorDescription:
+          description: "DescriÃ§Ã£o do Setor"
+          type: "string"
+        Activity_SectorCode:
+          description: "Activity_SectorCode"
+          type: "integer"
+          format: "int64"
+        StartTime:
+          description: "Activity_StartTime"
+          type: "string"
+          format: "date-time"
+        Title:
+          description: "Activity_Title"
+          type: "string"
+        SectionCode:
+          description: "ActivitySection_Code"
+          type: "integer"
+          format: "int64"
+        ActivitySectionDescription:
+          description: "ActivitySectionDescription"
+          type: "string"
+        AttendanceCode:
+          description: "Attendance_Code"
+          type: "integer"
+          format: "int64"
+        AttendanceDescription:
+          description: "AttendanceDescription"
+          type: "integer"
+          format: "int32"
+        ScheduleCode:
+          description: "Schedule_Code"
+          type: "integer"
+          format: "int64"
+        ScheduleDescription:
+          description: "ScheduleDescription"
+          type: "string"
+        TypeActivityCode:
+          description: "TypeActivity_Code"
+          type: "integer"
+          format: "int64"
+        TypeActivityDescription:
+          description: "TypeActivityDescription"
+          type: "string"
+        WorkflowStagesCode:
+          description: "WorkflowStages_Code"
+          type: "integer"
+          format: "int64"
+        WorkflowStagesDescription:
+          description: "WorkflowStagesDescription"
+          type: "string"
+        Message:
+          description: "Message"
+          type: "string"
+        FrequencyIndicatorCode:
+          description: "Codigo da FrequÃªncia do Indicador"
+          type: "integer"
+          format: "int64"
+        FrequencyIndicatorDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        AcceptanceCriteria:
+          description: "CritÃ©rios de AceitaÃ§Ã£o"
+          type: "string"
+        BusinessRule:
+          description: "Regras de NegÃ³cio"
+          type: "string"
+        FunctionalRequirements:
+          description: "Requisitos Funcionais"
+          type: "string"
+        Objective:
+          description: "Objetivo"
+          type: "string"
+        DevelopmentForecast:
+          description: "Activity_Development Forecast"
+          type: "integer"
+          format: "int32"
+        Stack:
+          description: "Activity_Stack"
+          type: "integer"
+          format: "int32"
+        DegreeRefusal:
+          description: "Activity_Degree Refusal"
+          type: "integer"
+          format: "int32"
+
+        WorkflowStages:
+          type: array
+          items:
+            description: WorkflowStage
+            $ref: "#/components/schemas/CRUD.Work.Core.Engine.Responses_Activity.WorkflowStages_WorkflowStage"
+
+        IndustrialMachines:
+          type: array
+          items:
+            description: IndustrialMachine
+            $ref: "#/components/schemas/CRUD.Work.Core.Engine.Responses_Activity.IndustrialMachines_IndustrialMachine"
+
+
+    CRUD.Work.Core.Engine.Responses_Activity.WorkflowStages_WorkflowStage:
+      properties:
+        Code:
+          description: "CÃ³digo da Atividade do EstÃ¡gios do Fluxo de Trabalho"
+          type: "integer"
+          format: "int64"
+        ActivityCode:
+          description: "CÃ³digo da Atividade"
+          type: "integer"
+          format: "int64"
+        ActivityTitle:
+          description: "Titulo da Atividade"
+          type: "string"
+        ActivityContextCode:
+          description: "Activity Workflow Stages_Activity Context Code"
+          type: "integer"
+          format: "int64"
+        WorkflowStagesCode:
+          description: "CÃ³digo do EstiÃ¡gio do Fluxo de Trabalho"
+          type: "integer"
+          format: "int64"
+        WorkflowStagesDescription:
+          description: "DescriÃ§Ã£o do EstÃ¡gio do Fluxo de Trabalho"
+          type: "string"
+        WorkflowStagesColor:
+          description: "Cor"
+          type: "string"
+        WorkflowStagesActivityClosed:
+          description: "Atividade Fechada"
+          type: "boolean"
+        WorkflowStagesActivityRefused:
+          description: "Atividade Recusada"
+          type: "boolean"
+        WorkflowStagesPendingAcceptance:
+          description: "AceitaÃ§Ã£o Pendente"
+          type: "boolean"
+        WorkflowCode:
+          description: "Activity Workflow Stages_Workflow Code"
+          type: "integer"
+          format: "int64"
+        RequesterPersonCode:
+          description: "CÃ³digo do Requisitante"
+          type: "integer"
+          format: "int64"
+        RequesterTypePersonCode:
+          description: "CÃ³digo do Tipo de Requisitante"
+          type: "integer"
+          format: "int32"
+        RequesterTypePersonDescription:
+          description: "DescriÃ§Ã£o do Tipo de Pessoa do Requisitante"
+          type: "string"
+        RequesterPersonName:
+          description: "Nome do Requisitante"
+          type: "string"
+        RequesterPersonLastName:
+          description: "Sobrenome do Requisitante"
+          type: "string"
+        RequesterPersonSocialName:
+          description: "Nome Social do Requisitante"
+          type: "string"
+        RequesterPersonDocumentType:
+          description: "Tipo do Documento do Requisitante"
+          type: "integer"
+          format: "int32"
+        RequesterPersonDocumentNumber:
+          description: "Numero do Documento do Requisitante"
+          type: "string"
+        RequesterPersonSequentialCode:
+          description: "CÃ³digo Sequencial do Requisitante"
+          type: "integer"
+          format: "int64"
+        RequesterPersonUserGuid:
+          description: "Chave Candidata do UsuÃ¡rio"
+          type: "string"
+          format: "uuid"
+        RequesterPersonAddressCode:
+          description: "Activity Workflow Stages_Requester Person Address Code"
+          type: "integer"
+          format: "int64"
+        RequesterPersonAddressIdentifier:
+          description: "Activity Workflow Stages_Requester Person Address Identifier"
+          type: "string"
+        RequesterPersonFullName:
+          description: "Nome Completo do Requisitante"
+          type: "string"
+        RequesterRelationshipCode:
+          description: "CÃ³digo do Relacionamento do Requisitante"
+          type: "integer"
+          format: "int64"
+        RequesterRelationshipDescription:
+          description: "DescriÃ§Ã£o do Relacionamento "
+          type: "string"
+        RequesterPersonContactCode:
+          description: "CÃ³digo do Contato do Requisitante"
+          type: "integer"
+          format: "int64"
+        RequesterPersonContactName:
+          description: "Nome do Contato do Requisitante"
+          type: "string"
+        RequesterPersonContactDocumentType:
+          description: "Tipo do Documento do Contato do Requisitante"
+          type: "integer"
+          format: "int32"
+        RequesterPersonContactDocumentNumber:
+          description: "Numero do Documento do contato do Requisitante"
+          type: "string"
+        RequesterPersonContactDocumentEmail:
+          description: "Email do Contato do Requisitante"
+          type: "string"
+        ResponsiblePersonCode:
+          description: "CÃ³digo do ResponsÃ¡vel"
+          type: "integer"
+          format: "int64"
+        ResponsibleTypePersonCode:
+          description: "CÃ³digo do Tipo de Pessoa ResponsÃ¡vel"
+          type: "integer"
+          format: "int32"
+        ResponsibleTypePersonDescription:
+          description: "DescriÃ§Ã£o do Tipo de Pessoa ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonName:
+          description: "Nome do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonLastName:
+          description: "Sobrenome do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonSocialName:
+          description: "Nome Social do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonDocumentType:
+          description: "Tipo de Documento do ResponsÃ¡vel"
+          type: "integer"
+          format: "int32"
+        ResponsiblePersonDocumentNumber:
+          description: "Numero do Documento do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonSequentialCode:
+          description: "CÃ³digo Sequencial do ResponsÃ¡vel"
+          type: "integer"
+          format: "int64"
+        ResponsiblePersonUserGuid:
+          description: "Chave Candidata do UsuÃ¡iro"
+          type: "string"
+          format: "uuid"
+        ResponsiblePersonFullName:
+          description: "Nome Completo do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonAddressCode:
+          description: "CÃ³digo do EndereÃ§o do ResponsÃ¡bel"
+          type: "integer"
+          format: "int64"
+        ResponsiblePersonAddressIdentifier:
+          description: "Identificador do EnderÃ§eo do ResponsÃ¡vel"
+          type: "string"
+        ResponsibleRelationshipCode:
+          description: "CÃ³digo do Contato do ResponsÃ¡vel"
+          type: "integer"
+          format: "int64"
+        ResponsibleRelationshipDescription:
+          description: "DescriÃ§Ã£o do Relacionamento do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonContactCode:
+          description: "Codigo do Contato do ResponsÃ¡vel"
+          type: "integer"
+          format: "int64"
+        ResponsiblePersonContactName:
+          description: "Nome do Contato do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonContactDocumentType:
+          description: "Tipo do Documento do Contato do ResponsÃ¡vel"
+          type: "integer"
+          format: "int32"
+        ResponsiblePersonContactDocumentNumber:
+          description: "NÃºmero do Documento do Contato do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonContactDocumentEmail:
+          description: "Email do Contato do ResponsÃ¡vel "
+          type: "string"
+        Order:
+          description: "Ordem"
+          type: "integer"
+          format: "int32"
+        OrderTo:
+          description: "Ordem para"
+          type: "integer"
+          format: "int32"
+        LastDateOrderUpdate:
+          description: "Ultima data de AtualizaÃ§Ã£o do Pedido"
+          type: "string"
+          format: "date-time"
+        Guid:
+          description: "Chave Candidata da Atividade do EstÃ¡gios do Fluxo de Trabalho"
+          type: "string"
+          format: "uuid"
+
+
+      x-gx-level: "Responses_Activity"
+
+
+    CRUD.Work.Core.Engine.Responses_Activity.IndustrialMachines_IndustrialMachine:
+      properties:
+        IndustrialMachineCode:
+          description: "CÃ³digo da Maquina Industrial"
+          type: "integer"
+          format: "int64"
+        IndustrialMachineDescription:
+          description: "DescriÃ§Ã£o da Ferramenta Industrial"
+          type: "string"
+
+
+      x-gx-level: "Responses_Activity"
+
+    CRUD.Work.Core.Handmade.ActivityComplete:
+      properties:
+        Code:
+          description: "Activity_Code"
+          type: "integer"
+          format: "int64"
+        ParentCode:
+          description: "Activity_Parent Code"
+          type: "integer"
+          format: "int64"
+        ParentDescription:
+          description: "Activity_Parent Description"
+          type: "string"
+        TypeActivityCode:
+          description: "CÃ³digo do Tipo de Atividade"
+          type: "integer"
+          format: "int64"
+        TypeActivityDescription:
+          description: "DescriÃ§Ã£o do Tipo de Atividade"
+          type: "string"
+        KanbanCardTemplateCode:
+          description: "CÃ³digo do Modelo da Template do Kanban"
+          type: "integer"
+          format: "int64"
+        KanbanCardTemplateDescription:
+          description: "DescriÃ§Ã£o do Modelo da Template do Kanban"
+          type: "string"
+        OccurrenceCode:
+          description: "CÃ³digo do Occurrence"
+          type: "integer"
+          format: "int64"
+        OccurrenceDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        OccurrenceGuid:
+          description: "Chave Candidata do Occurrence"
+          type: "string"
+          format: "uuid"
+        AttendanceCode:
+          description: "CÃ³digo do Atendimento"
+          type: "integer"
+          format: "int64"
+        ProjectCode:
+          description: "Activity_Project Code"
+          type: "integer"
+          format: "int64"
+        ProjectName:
+          description: "Activity_Project Name"
+          type: "string"
+        EpicCode:
+          description: "Activity_Epic Code"
+          type: "integer"
+          format: "int64"
+        EpicDescription:
+          description: "Activity_Epic Description"
+          type: "string"
+        IssueCode:
+          description: "Activity_Issue Code"
+          type: "integer"
+          format: "int64"
+        IssueDescription:
+          description: "Activity_Issue Description"
+          type: "string"
+        Title:
+          description: "Activity_Title"
+          type: "string"
+        Problem:
+          description: "Activity_Problem"
+          type: "string"
+        FocusFactoryCode:
+          description: "CÃ³digo da FocusFactory"
+          type: "integer"
+          format: "int64"
+        FocusFactoryDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        Description:
+          description: "Activity_Description"
+          type: "string"
+        Detail:
+          description: "Activity_Detail"
+          type: "string"
+        DescriptionForRelease:
+          description: "Activity_Description For Release"
+          type: "string"
+        DetailForRelease:
+          description: "Activity_Detail For Release"
+          type: "string"
+        Priority:
+          description: "Activity_Priority"
+          type: "integer"
+          format: "int32"
+        Complexity:
+          description: "Activity_Complexity"
+          type: "integer"
+          format: "int32"
+        Outsourced:
+          description: "Activity_Outsourced"
+          type: "boolean"
+        EstimatedTimeExecution:
+          description: "Activity_Estimated Time Execution"
+          type: "integer"
+          format: "int64"
+        EstimatedTimeReview:
+          description: "Activity_Estimated Time Review"
+          type: "integer"
+          format: "int64"
+        EstimatedTimeTesting:
+          description: "Activity_Estimated Time Testing"
+          type: "integer"
+          format: "int64"
+        Deadline:
+          description: "Activity_Deadline"
+          type: "string"
+          format: "date-time"
+        PlannedDate:
+          description: "Activity_Planned Date"
+          type: "string"
+          format: "date"
+        ReplannedDate:
+          description: "Activity_Replanned Date"
+          type: "string"
+          format: "date"
+        ImplementedDate:
+          description: "Activity_Implemented Date"
+          type: "string"
+          format: "date"
+        LastDateOrderUpdate:
+          description: "Ultima data de AtualizaÃ§Ã£o do Pedido"
+          type: "string"
+          format: "date-time"
+        StartTime:
+          description: "Activity_Start Time"
+          type: "string"
+          format: "date-time"
+        EndTime:
+          description: "Activity_End Time"
+          type: "string"
+          format: "date-time"
+        IsOnline:
+          description: "Activity_Is Online"
+          type: "boolean"
+        Link:
+          description: "Activity_Link"
+          type: "string"
+        Script:
+          description: "Activity_Script"
+          type: "string"
+        ScheduleCode:
+          description: "Codigo da Agenda"
+          type: "integer"
+          format: "int64"
+        ScheduleDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        CorrectiveAction:
+          description: "Activity_Corrective Action"
+          type: "string"
+        Filed:
+          description: "Activity_Filed"
+          type: "boolean"
+        TotalAttachment:
+          description: "Anexo Total"
+          type: "integer"
+          format: "int32"
+        CancellationDate:
+          description: "Activity_Cancellation Date"
+          type: "string"
+          format: "date"
+        ReasonCancellation:
+          description: "Activity_Reason Cancellation"
+          type: "string"
+        ReasonRefusal:
+          description: "Activity_Reason Refusal"
+          type: "string"
+        ReasonDate:
+          description: "Activity_Reason Date"
+          type: "string"
+          format: "date"
+        RequiresAttachment:
+          description: "Activity_Requires Attachment"
+          type: "boolean"
+        ActivityClosed:
+          description: "Atividade Fechada"
+          type: "boolean"
+        ActionPlanCode:
+          description: "CÃ³digo do Plano de AÃ§Ã£o"
+          type: "integer"
+          format: "int64"
+        ActionPlanDescription:
+          description: "DescriÃ§Ã£o do Plano de AÃ§Ã£o"
+          type: "string"
+        ActivitySectionCode:
+          description: "CÃ³digo da SeÃ§Ã£o da Atividade"
+          type: "integer"
+          format: "int64"
+        ActivitySectionDescription:
+          description: "DescriÃ§Ã£o da SeÃ§Ã£o da Atividade"
+          type: "string"
+        CompletionLevel:
+          description: "Activity_Completion Level"
+          type: "integer"
+          format: "int32"
+        OccurrenceCausesCode:
+          description: "CÃ³digo da Causa da OcÃ´rrencia"
+          type: "integer"
+          format: "int64"
+        OccurrenceCausesDetail:
+          description: "Detalhe da Causa da OcÃ´rrencia"
+          type: "string"
+        SectorCode:
+          description: "Activity_Sector Code"
+          type: "integer"
+          format: "int64"
+        SectorDescription:
+          description: "Activity_Sector Description"
+          type: "string"
+        IsModel:
+          description: "Ã‰ Modelo"
+          type: "boolean"
+        Private:
+          description: "Privado"
+          type: "boolean"
+        ActivityArchived:
+          description: "Atividade Arquivada"
+          type: "boolean"
+        ActivityFailed:
+          description: "Activity_Activity Failed"
+          type: "boolean"
+        CorporateDivisionCode:
+          description: "CÃ³digo da DivisÃ£o Corporativa"
+          type: "integer"
+          format: "int64"
+        CorporateDivisionDescription:
+          description: "DescriÃ§Ã£o da DivisÃ£o Corporativa"
+          type: "string"
+        FrequencyIndicatorCode:
+          description: "Codigo da FrequÃªncia do Indicador"
+          type: "integer"
+          format: "int64"
+        FrequencyIndicatorDescription:
+          description: "DescriÃ§Ã£o da FrequÃªncia do Indicador"
+          type: "string"
+        AcceptanceCriteria:
+          description: "CritÃ©rios de AceitaÃ§Ã£o"
+          type: "string"
+        BusinessRule:
+          description: "Regras de NegÃ³cio"
+          type: "string"
+        FunctionalRequirements:
+          description: "Requisitos Funcionais"
+          type: "string"
+        Objective:
+          description: "Objetivo"
+          type: "string"
+        AuditAnswerCode:
+          description: "CÃ³digo da Resposta da Auditoria"
+          type: "integer"
+          format: "int64"
+        AttendanceAnswerCode:
+          description: "CÃ³digo da Resposta do Atendimento"
+          type: "integer"
+          format: "int64"
+        OccurrenceAnswerCode:
+          description: "Activity_Occurrence Answer Code"
+          type: "integer"
+          format: "int64"
+        AuditCode:
+          description: "CÃ³digo da Auditoria"
+          type: "integer"
+          format: "int64"
+        AuditGuid:
+          description: "Chave Candidata da Auditoria"
+          type: "string"
+          format: "uuid"
+        ReleaseCode:
+          description: "CÃ³digo do LanÃ§amento"
+          type: "integer"
+          format: "int64"
+        ReleaseDescription:
+          description: "DescriÃ§Ã£o do LanÃ§amento"
+          type: "string"
+        DegreeRefusal:
+          description: "Activity_Degree Refusal"
+          type: "integer"
+          format: "int32"
+        Stack:
+          description: "Activity_Stack"
+          type: "integer"
+          format: "int32"
+        DevelopmentForecast:
+          description: "Activity_Development Forecast"
+          type: "integer"
+          format: "int32"
+        Amount:
+          description: "Quantidade"
+          type: "number"
+          format: "double"
+        Guid:
+          description: "Activity_Guid"
+          type: "string"
+          format: "uuid"
+
+        DetailsAttachments:
+          type: array
+          items:
+            description: DetailsAttachment
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.DetailsAttachments_DetailsAttachment"
+
+        Attachments:
+          type: array
+          items:
+            description: Attachment
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Attachments_Attachment"
+
+        Customers:
+          type: array
+          items:
+            description: Customer
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Customers_Customer"
+
+        Collaborators:
+          type: array
+          items:
+            description: Collaborator
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Collaborators_Collaborator"
+
+        Tags:
+          type: array
+          items:
+            description: Tag
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Tags_Tag"
+
+        Participants:
+          type: array
+          items:
+            description: Participant
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Participants_Participant"
+
+        Chats:
+          type: array
+          items:
+            description: Chat
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Chats_Chat"
+
+        Indicators:
+          type: array
+          items:
+            description: Indicator
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Indicators_Indicator"
+
+        APPs:
+          type: array
+          items:
+            description: APP
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.APPs_APP"
+
+        SmartFormAnswers:
+          type: array
+          items:
+            description: SmartFormAnswer
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.SmartFormAnswers_SmartFormAnswer"
+
+        Companies:
+          type: array
+          items:
+            description: Company
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Companies_Company"
+
+        Orders:
+          $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Orders"
+
+        WorkflowStages:
+          type: array
+          items:
+            description: WorkflowStage
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.WorkflowStages_WorkflowStage"
+
+        Causes:
+          type: array
+          items:
+            description: Cause
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Causes_Cause"
+
+        IndustrialMachines:
+          type: array
+          items:
+            description: IndustrialMachine
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.IndustrialMachines_IndustrialMachine"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.DetailsAttachments_DetailsAttachment:
+      properties:
+        Code:
+          description: "CÃ³digo dos Detalhes do Anexo da Atividade"
+          type: "integer"
+          format: "int64"
+        Type:
+          description: "Tipo de Anexo"
+          type: "integer"
+          format: "int32"
+        Title:
+          description: "TÃ­tulo"
+          type: "string"
+        Identifier:
+          description: "Identificador"
+          type: "string"
+        Origin:
+          description: "Origem"
+          type: "string"
+        LocationIdentifier:
+          description: "Identificador de localizaÃ§Ã£o"
+          type: "string"
+        BlobFile:
+          description: "Blob File"
+          type: "string"
+        Guid:
+          description: "Chave Candidata dos Detalhes do Anexo da Atividade"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Attachments_Attachment:
+      properties:
+        Code:
+          description: "CÃ³digo do  Anexo da Atividade"
+          type: "integer"
+          format: "int64"
+        TypeDocumentCode:
+          description: "Codigo do Tipo de Documento"
+          type: "integer"
+          format: "int64"
+        TypeDocumentDescription:
+          description: "DescriÃ§Ã£o do Tipo de Documento"
+          type: "string"
+        TypeAttachmentCode:
+          description: "CÃ³digo do Tipo de Anexo"
+          type: "integer"
+          format: "int64"
+        TypeAttachmentDescription:
+          description: "DescriÃ§Ã£o do Tipo de Anexo"
+          type: "string"
+        Description:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        Identifier:
+          description: "Activity Attachment_Identifier"
+          type: "string"
+        File:
+          description: "Arquivo"
+          type: "string"
+        VisibleCustomer:
+          description: "UsuÃ¡rio Visivel"
+          type: "boolean"
+        Status:
+          description: "Status"
+          type: "integer"
+          format: "int32"
+        Guid:
+          description: "Chave Candidata do Anexo da Atividade"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Customers_Customer:
+      properties:
+        Code:
+          description: "Activity Customer_Code"
+          type: "integer"
+          format: "int64"
+        CustomerCode:
+          description: "Activity Customer_Customer Code"
+          type: "integer"
+          format: "int64"
+        CustomerTypePersonCode:
+          description: "Activity Customer_Customer Type Person Code"
+          type: "integer"
+          format: "int32"
+        CustomerTypePersonDescription:
+          description: "Activity Customer_Customer Type Person Description"
+          type: "string"
+        CustomerContactCode:
+          description: "Activity Customer_Person Contact Code"
+          type: "integer"
+          format: "int64"
+        CustomerContactName:
+          description: "Activity Customer_Person Contact Name"
+          type: "string"
+        CustomerName:
+          description: "Activity Customer_Customer Name"
+          type: "string"
+        CustomerLastName:
+          description: "Activity Customer_Customer Last Name"
+          type: "string"
+        CustomerSocialName:
+          description: "Activity Customer_Customer Social Name"
+          type: "string"
+        CustomerFullName:
+          description: "Activity Customer_Customer Full Name"
+          type: "string"
+        CustomerDocumentType:
+          description: "Activity Customer_Customer Document Type"
+          type: "integer"
+          format: "int32"
+        CustomerDocumentNumber:
+          description: "Activity Customer_Customer Document Number"
+          type: "string"
+        CustomerSequentialCode:
+          description: "Activity Customer_Customer Sequential Code"
+          type: "integer"
+          format: "int64"
+        CustomerUserGuid:
+          description: "Activity Customer_Customer User Guid"
+          type: "string"
+          format: "uuid"
+        Default:
+          description: "Activity Customer_Default"
+          type: "integer"
+          format: "int32"
+        Guid:
+          description: "Activity Customer_Guid"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Collaborators_Collaborator:
+      properties:
+        Code:
+          description: "Activity Collaborator_Code"
+          type: "integer"
+          format: "int64"
+        CollaboratorCode:
+          description: "CÃ³digo do Colaborador"
+          type: "integer"
+          format: "int64"
+        CollaboratorTypePersonCode:
+          description: "CÃ³digo do Tipo de Pessoa"
+          type: "integer"
+          format: "int32"
+        CollaboratorTypePersonDescription:
+          description: "DescriÃ§Ã£o do Tipo de Pessoa"
+          type: "string"
+        CollaboratorName:
+          description: "Nome"
+          type: "string"
+        CollaboratorLastName:
+          description: "Sobrenome"
+          type: "string"
+        CollaboratorFullName:
+          description: "Nome Completo"
+          type: "string"
+        CollaboratorDocumentType:
+          description: "Tipo Documento"
+          type: "integer"
+          format: "int32"
+        CollaboratorDocumentNumber:
+          description: "NÃºmero Documento"
+          type: "string"
+        CollaboratorSequentialCode:
+          description: "CÃ³digo Seq."
+          type: "integer"
+          format: "int64"
+        CurrentResponsible:
+          description: "Activity Collaborator_Current Responsible"
+          type: "boolean"
+        Guid:
+          description: "Activity Collaborator_Guid"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Tags_Tag:
+      properties:
+        Code:
+          description: "Activity Tags_Code"
+          type: "integer"
+          format: "int64"
+        TagCode:
+          description: "CÃ³digo da Etiqueta"
+          type: "integer"
+          format: "int64"
+        TagDescription:
+          description: "DescriÃ§Ã£o da Etiqueta"
+          type: "string"
+        Guid:
+          description: "Activity Tags_Guid"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Participants_Participant:
+      properties:
+        Code:
+          description: "Activity Participants_Code"
+          type: "integer"
+          format: "int64"
+        PersonCode:
+          description: "CÃ³digo da Pessoa"
+          type: "integer"
+          format: "int64"
+        TypePersonCode:
+          description: "CÃ³digo do Tipo de Pessoa"
+          type: "integer"
+          format: "int32"
+        TypePersonDescription:
+          description: "DescriÃ§Ã£o do Tipo de Pessoa"
+          type: "string"
+        PersonType:
+          description: "Tipo da Pessoa"
+          type: "integer"
+          format: "int32"
+        PersonName:
+          description: "Nome"
+          type: "string"
+        PersonLastName:
+          description: "Sobrenome"
+          type: "string"
+        SocialName:
+          description: "Nome Social"
+          type: "string"
+        PersonDocumentType:
+          description: "Tipo de Documento"
+          type: "integer"
+          format: "int32"
+        PersonDocumentNumber:
+          description: "Numero do Documento"
+          type: "string"
+        SequentialCode:
+          description: "CÃ³digo Sequencial"
+          type: "integer"
+          format: "int64"
+        UserGuid:
+          description: "Chave Candidata do UsuÃ¡rio"
+          type: "string"
+          format: "uuid"
+        PersonFullName:
+          description: "Nome Completo"
+          type: "string"
+        PersonContactCode:
+          description: "CÃ³digo do Contato da pessoa"
+          type: "integer"
+          format: "int64"
+        PersonContactName:
+          description: "Activity Participants_Person Contact Name"
+          type: "string"
+        PersonContactDocumentType:
+          description: "Activity Participants_Person Contact Document Type"
+          type: "integer"
+          format: "int32"
+        PersonContactDocumentNumber:
+          description: "Activity Participants_Person Contact Document Number"
+          type: "string"
+        PersonContactEmail:
+          description: "Activity Participants_Person Contact Email"
+          type: "string"
+        PersonAddressCode:
+          description: "Activity Participants_Person Address Code"
+          type: "integer"
+          format: "int64"
+        PersonAddressIdentifier:
+          description: "Activity Participants_Person Address Identifier"
+          type: "string"
+        PersonRelationshipCode:
+          description: "Activity Participants_Person Relationship Code"
+          type: "integer"
+          format: "int64"
+        PersonRelationshipDescription:
+          description: "Activity Participants_Person Relationship Description"
+          type: "string"
+        Internal:
+          description: "Activity Participants_Internal"
+          type: "boolean"
+        Guid:
+          description: "Activity Participants_Guid"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Chats_Chat:
+      properties:
+        Code:
+          description: "Bate-Papo da Atividade"
+          type: "integer"
+          format: "int64"
+        ParentCode:
+          description: "CÃ³digo Pai do Bate-Papo da Atividade"
+          type: "integer"
+          format: "int64"
+        PersonCode:
+          description: "CÃ³digo da Pessoa"
+          type: "integer"
+          format: "int64"
+        TypePersonCode:
+          description: "CÃ³digo do Tipo de Pessoa"
+          type: "integer"
+          format: "int32"
+        TypePersonDescription:
+          description: "DescriÃ§Ã£o do Tipo de Pessoa"
+          type: "string"
+        PersonType:
+          description: "Tipo da Pessoa"
+          type: "integer"
+          format: "int32"
+        PersonName:
+          description: "Nome"
+          type: "string"
+        PersonLastName:
+          description: "Sobrenome"
+          type: "string"
+        SocialName:
+          description: "Nome Social"
+          type: "string"
+        PersonDocumentType:
+          description: "Tipo de Documento"
+          type: "integer"
+          format: "int32"
+        PersonDocumentNumber:
+          description: "Numero do Documento"
+          type: "string"
+        PersonSequentialCode:
+          description: "CÃ³digo Sequencial"
+          type: "integer"
+          format: "int64"
+        UserGuid:
+          description: "Chave Candidata do UsuÃ¡rio"
+          type: "string"
+          format: "uuid"
+        PersonFullName:
+          description: "Nome Completo"
+          type: "string"
+        PersonContactCode:
+          description: "Activity Chat_Person Contact Code"
+          type: "integer"
+          format: "int64"
+        PersonContactName:
+          description: "Activity Chat_Person Contact Name"
+          type: "string"
+        PersonContactDocumentType:
+          description: "Activity Chat_Person Contact Document Type"
+          type: "integer"
+          format: "int32"
+        PersonContactDocumentNumber:
+          description: "Activity Chat_Person Contact Document Number"
+          type: "string"
+        PersonContactEmail:
+          description: "Activity Chat_Person Contact Email"
+          type: "string"
+        PersonAddressCode:
+          description: "Activity Chat_Person Address Code"
+          type: "integer"
+          format: "int64"
+        PersonAddressIdentifier:
+          description: "Activity Chat_Person Address Identifier"
+          type: "string"
+        PersonRelationshipCode:
+          description: "Activity Chat_Person Relationship Code"
+          type: "integer"
+          format: "int64"
+        PersonRelationshipDescription:
+          description: "Activity Chat_Person Relationship Description"
+          type: "string"
+        Text:
+          description: "Texto"
+          type: "string"
+        CommentDate:
+          description: "Data do ComentÃ¡rio"
+          type: "string"
+          format: "date-time"
+        Guid:
+          description: "Chave Candidata do Bate-Papo da Atividade"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+        CreatedIn:
+          description: "Data de CriaÃ§Ã£o"
+          type: "string"
+          format: "date-time"
+
+        ChatFiles:
+          type: array
+          items:
+            description: ChatFile
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Chats.ChatFiles_ChatFile"
+
+      x-gx-level: "ActivityComplete"
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Chats.ChatFiles_ChatFile:
+      properties:
+        Code:
+          description: "CÃ³digo do Arquivo do Chat da Atividade"
+          type: "integer"
+          format: "int64"
+        File:
+          description: "Arquivo"
+          type: "string"
+        Description:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        Guid:
+          description: "Chave Candidata do Arquivo do Chat da Atividade"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete.Chats"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Indicators_Indicator:
+      properties:
+        Code:
+          description: "CÃ³digo do Indicador da Atividade"
+          type: "integer"
+          format: "int64"
+        IndicatorCode:
+          description: "CÃ³digo do Indicador"
+          type: "integer"
+          format: "int64"
+        IndicatorDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        FrequencyCode:
+          description: "CÃ³digo da Frequencia"
+          type: "integer"
+          format: "int64"
+        FrequencyDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        Main:
+          description: "Principal"
+          type: "boolean"
+        Guid:
+          description: "Chave Candidata do Indicador da Atividade"
+          type: "string"
+          format: "uuid"
+        IsDeleted:
+          description: "Is Deleted"
+          type: "boolean"
+
+        Reasons:
+          type: array
+          items:
+            description: Reason
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.Indicators.Reasons_Reason"
+
+      x-gx-level: "ActivityComplete"
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Indicators.Reasons_Reason:
+      properties:
+        Code:
+          description: "Activity Indicator Reasons_Code"
+          type: "integer"
+          format: "int64"
+        IndicatorReasonCode:
+          description: "CÃ³digo da RazÃ£o do Indicador"
+          type: "integer"
+          format: "int64"
+        IndicatorReasonDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        Guid:
+          description: "Activity Indicator Reasons_Guid"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete.Indicators"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.APPs_APP:
+      properties:
+        Code:
+          description: "CÃ³digo do Aplicativo de Atividade"
+          type: "integer"
+          format: "int64"
+        APPcode:
+          description: "CÃ³digo do APP"
+          type: "integer"
+          format: "int64"
+        APPDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        ID:
+          description: "ID"
+          type: "string"
+        Description:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        Status:
+          description: "Status"
+          type: "integer"
+          format: "int32"
+        Excluded:
+          description: "ExcluÃ­do"
+          type: "boolean"
+        Guid:
+          description: "Chave Candidata do Aplicativo da Ativdade"
+          type: "string"
+          format: "uuid"
+        AlreadyRegistered:
+          description: "Already Registered"
+          type: "boolean"
+        IsDeleted:
+          description: "Is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.SmartFormAnswers_SmartFormAnswer:
+      properties:
+        Code:
+          description: "CÃ³digo do FormulÃ¡rio Inteligente  da Atividade"
+          type: "integer"
+          format: "int64"
+        SmartFormCode:
+          description: "CÃ³digo"
+          type: "integer"
+          format: "int64"
+        Json:
+          description: "Json"
+          type: "string"
+        Guid:
+          description: "Chave Candidata do FormulÃ¡rio Inteligente  da Atividade"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+        SmartFormAnswerFiles:
+          type: array
+          items:
+            description: SmartFormAnswerFile
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.ActivityComplete.SmartFormAnswers.SmartFormAnswerFiles_SmartFormAnswerFile"
+
+      x-gx-level: "ActivityComplete"
+
+    CRUD.Work.Core.Handmade.ActivityComplete.SmartFormAnswers.SmartFormAnswerFiles_SmartFormAnswerFile:
+      properties:
+        Code:
+          description: "CÃ³digo do Arquivo do FormulÃ¡rio Inteligente da Atividade"
+          type: "integer"
+          format: "int64"
+        Identifier:
+          description: "Identificador"
+          type: "string"
+        BlobFile:
+          description: "Arquivo"
+          type: "string"
+        Guid:
+          description: "Chave Candidata do Arquivo do FormulÃ¡rio Inteligente da Atividade"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete.SmartFormAnswers"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Companies_Company:
+      properties:
+        Code:
+          description: "CÃ³digo das Empresas da Atividade"
+          type: "integer"
+          format: "int64"
+        CompanyCode:
+          description: "CÃ³digo da Empresa"
+          type: "integer"
+          format: "int64"
+        CorporateName:
+          description: "Nome Corporativo"
+          type: "string"
+        Guid:
+          description: "Chave Candidata das Empresas da Atividade"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Orders:
+      properties:
+        Code:
+          description: "CÃ³digo do Pedido da Atividade"
+          type: "integer"
+          format: "int64"
+        OrderCode:
+          description: "CÃ³digo Pedido de Venda"
+          type: "integer"
+          format: "int64"
+        Guid:
+          description: "Chave Candidata do Pedido da Atividade"
+          type: "string"
+          format: "uuid"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.WorkflowStages_WorkflowStage:
+      properties:
+        Code:
+          description: "CÃ³digo da Atividade do EstÃ¡gios do Fluxo de Trabalho"
+          type: "integer"
+          format: "int64"
+        WorkflowStagesCode:
+          description: "CÃ³digo do EstiÃ¡gio do Fluxo de Trabalho"
+          type: "integer"
+          format: "int64"
+        WorkflowStagesDescription:
+          description: "DescriÃ§Ã£o do EstÃ¡gio do Fluxo de Trabalho"
+          type: "string"
+        WorkflowStagesColor:
+          description: "Cor"
+          type: "string"
+        WorkflowStagesActivityClosed:
+          description: "Atividade Fechada"
+          type: "boolean"
+        WorkflowStagesActivityRefused:
+          description: "Atividade Recusada"
+          type: "boolean"
+        WorkflowStagesPendingAcceptance:
+          description: "AceitaÃ§Ã£o Pendente"
+          type: "boolean"
+        RequesterPersonCode:
+          description: "CÃ³digo do Requisitante"
+          type: "integer"
+          format: "int64"
+        RequesterTypePersonCode:
+          description: "CÃ³digo do Tipo de Requisitante"
+          type: "integer"
+          format: "int32"
+        RequesterTypePersonDescription:
+          description: "DescriÃ§Ã£o do Tipo de Pessoa do Requisitante"
+          type: "string"
+        RequesterPersonName:
+          description: "Nome do Requisitante"
+          type: "string"
+        RequesterPersonLastName:
+          description: "Sobrenome do Requisitante"
+          type: "string"
+        RequesterPersonSocialName:
+          description: "Nome Social do Requisitante"
+          type: "string"
+        RequesterPersonDocumentType:
+          description: "Tipo do Documento do Requisitante"
+          type: "integer"
+          format: "int32"
+        RequesterPersonDocumentNumber:
+          description: "Numero do Documento do Requisitante"
+          type: "string"
+        RequesterPersonSequentialCode:
+          description: "CÃ³digo Sequencial do Requisitante"
+          type: "integer"
+          format: "int64"
+        RequesterPersonUserGuid:
+          description: "Chave Candidata do UsuÃ¡rio"
+          type: "string"
+          format: "uuid"
+        RequesterPersonAddressCode:
+          description: "Activity Workflow Stages_Requester Person Address Code"
+          type: "integer"
+          format: "int64"
+        RequesterPersonAddressIdentifier:
+          description: "Activity Workflow Stages_Requester Person Address Identifier"
+          type: "string"
+        RequesterPersonFullName:
+          description: "Nome Completo do Requisitante"
+          type: "string"
+        RequesterRelationshipCode:
+          description: "CÃ³digo do Relacionamento do Requisitante"
+          type: "integer"
+          format: "int64"
+        RequesterRelationshipDescription:
+          description: "DescriÃ§Ã£o do Relacionamento "
+          type: "string"
+        RequesterPersonContactCode:
+          description: "CÃ³digo do Contato do Requisitante"
+          type: "integer"
+          format: "int64"
+        RequesterPersonContactName:
+          description: "Nome do Contato do Requisitante"
+          type: "string"
+        RequesterPersonContactDocumentType:
+          description: "Tipo do Documento do Contato do Requisitante"
+          type: "integer"
+          format: "int32"
+        RequesterPersonContactDocumentNumber:
+          description: "Numero do Documento do contato do Requisitante"
+          type: "string"
+        RequesterPersonContactDocumentEmail:
+          description: "Email do Contato do Requisitante"
+          type: "string"
+        ResponsiblePersonCode:
+          description: "CÃ³digo do ResponsÃ¡vel"
+          type: "integer"
+          format: "int64"
+        ResponsibleTypePersonCode:
+          description: "CÃ³digo do Tipo de Pessoa ResponsÃ¡vel"
+          type: "integer"
+          format: "int32"
+        ResponsibleTypePersonDescription:
+          description: "DescriÃ§Ã£o do Tipo de Pessoa ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonName:
+          description: "Nome do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonLastName:
+          description: "Sobrenome do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonSocialName:
+          description: "Nome Social do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonDocumentType:
+          description: "Tipo de Documento do ResponsÃ¡vel"
+          type: "integer"
+          format: "int32"
+        ResponsiblePersonDocumentNumber:
+          description: "Numero do Documento do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonSequentialCode:
+          description: "CÃ³digo Sequencial do ResponsÃ¡vel"
+          type: "integer"
+          format: "int64"
+        ResponsiblePersonUserGuid:
+          description: "Chave Candidata do UsuÃ¡iro"
+          type: "string"
+          format: "uuid"
+        ResponsiblePersonFullName:
+          description: "Nome Completo do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonAddressCode:
+          description: "CÃ³digo do EndereÃ§o do ResponsÃ¡bel"
+          type: "integer"
+          format: "int64"
+        ResponsiblePersonAddressIdentifier:
+          description: "Identificador do EnderÃ§eo do ResponsÃ¡vel"
+          type: "string"
+        ResponsibleRelationshipCode:
+          description: "CÃ³digo do Contato do ResponsÃ¡vel"
+          type: "integer"
+          format: "int64"
+        ResponsibleRelationshipDescription:
+          description: "DescriÃ§Ã£o do Relacionamento do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonContactCode:
+          description: "Codigo do Contato do ResponsÃ¡vel"
+          type: "integer"
+          format: "int64"
+        ResponsiblePersonContactName:
+          description: "Nome do Contato do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonContactDocumentType:
+          description: "Tipo do Documento do Contato do ResponsÃ¡vel"
+          type: "integer"
+          format: "int32"
+        ResponsiblePersonContactDocumentNumber:
+          description: "NÃºmero do Documento do Contato do ResponsÃ¡vel"
+          type: "string"
+        ResponsiblePersonContactDocumentEmail:
+          description: "Email do Contato do ResponsÃ¡vel "
+          type: "string"
+        LastDateOrderUpdate:
+          description: "Ultima data de AtualizaÃ§Ã£o do Pedido"
+          type: "string"
+          format: "date-time"
+        Order:
+          description: "Ordem"
+          type: "integer"
+          format: "int32"
+        OrderTo:
+          description: "Ordem para"
+          type: "integer"
+          format: "int32"
+        Guid:
+          description: "Chave Candidata da Atividade do EstÃ¡gios do Fluxo de Trabalho"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+        WorkflowCode:
+          description: "CÃ³digo do Fluxo de Trabalho"
+          type: "integer"
+          format: "int64"
+        WorkflowDescription:
+          description: "DescriÃ§Ã£o do Fluxo de Trabalho"
+          type: "string"
+        ModifiedIn:
+          description: "Data de ModificaÃ§Ã£o"
+          type: "string"
+          format: "date-time"
+        MovedByPersonCode:
+          description: "Activity Workflow Stages_Moved By Person Code"
+          type: "integer"
+          format: "int64"
+        MovedByPersonName:
+          description: "Activity Workflow Stages_Moved By Person Name"
+          type: "string"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.Causes_Cause:
+      properties:
+        Code:
+          description: "CÃ³digo da Causa da Atividade"
+          type: "integer"
+          format: "int64"
+        Detail:
+          description: "Detalhe"
+          type: "string"
+        Order:
+          description: "Ordem"
+          type: "integer"
+          format: "int32"
+        Guid:
+          description: "Chave Candidata da Causa da Atividade"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+
+    CRUD.Work.Core.Handmade.ActivityComplete.IndustrialMachines_IndustrialMachine:
+      properties:
+        Code:
+          description: "Activity Industrial Machine_Code"
+          type: "integer"
+          format: "int64"
+        IndustrialMachineCode:
+          description: "CÃ³digo da Maquina Industrial"
+          type: "integer"
+          format: "int64"
+        IndustrialMachineDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        FocusFactoryCode:
+          description: "CÃ³digo da Focus Factory"
+          type: "integer"
+          format: "int64"
+        FocusFactoryDescription:
+          description: "DescriÃ§Ã£o da Focus Factory"
+          type: "string"
+        PlaceCode:
+          description: "CÃ³digo do Posto"
+          type: "integer"
+          format: "int64"
+        PlaceDescription:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        Guid:
+          description: "Chave Candidata da Maquina Industrial da Atividade"
+          type: "string"
+          format: "uuid"
+        isDeleted:
+          description: "is Deleted"
+          type: "boolean"
+
+
+      x-gx-level: "ActivityComplete"
+
+    Services.Core.ResponseAPI:
+      properties:
+        ErrorCode:
+          description: "Error Code"
+          type: "string"
+        Guid:
+          description: "Guid"
+          type: "string"
+          format: "uuid"
+        LevelGuid:
+          description: "Level Guid"
+          type: "string"
+          format: "uuid"
+        Code:
+          description: "Code"
+          type: "integer"
+          format: "int64"
+        Valid:
+          description: "Valid"
+          type: "boolean"
+        Message:
+          description: "Message"
+          type: "string"
+
+
+
+    CRUD.SAC.Occurrence.Core.Handmade.Kanban_Column:
+      properties:
+        id:
+          description: "Guid Da Coluna"
+          type: "string"
+        title:
+          description: "Titulo da Coluna"
+          type: "string"
+        subtitle:
+          description: "Subtitulo  da Coluna (Opcional)"
+          type: "string"
+        add:
+          description: "Url do botÃ£o adicionar"
+          type: "string"
+        type:
+          description: "C-Coluna | B-BotÃ£o"
+          type: "string"
+        specialAction:
+          description: "Url da AÃ§Ã£o ao mover para essa coluna"
+          type: "string"
+        order:
+          description: "order"
+          type: "integer"
+          format: "int32"
+        color:
+          description: "color"
+          type: "string"
+
+        Cards:
+          type: array
+          items:
+            description: Card
+            $ref: "#/components/schemas/CRUD.SAC.Occurrence.Core.Handmade.Kanban.Cards_Card"
+
+        ExtraData:
+          type: array
+          items:
+            description: ExtraData
+            $ref: "#/components/schemas/CRUD.SAC.Occurrence.Core.Handmade.Kanban.ExtraData_ExtraData"
+
+
+    CRUD.SAC.Occurrence.Core.Handmade.Kanban.Cards_Card:
+      properties:
+        id:
+          description: "Guid do Card"
+          type: "string"
+        code:
+          description: "code"
+          type: "integer"
+          format: "int64"
+        parentCode:
+          description: "parent Code"
+          type: "integer"
+          format: "int64"
+        title:
+          description: "Titulo  do Card"
+          type: "string"
+        description:
+          description: "DescriÃ§Ã£o  do Card"
+          type: "string"
+        action:
+          description: "Url da aÃ§Ã£o ao clicar no card"
+          type: "string"
+        image:
+          description: "Imagem  do Card"
+          type: "string"
+        rating:
+          description: "AvaliaÃ§Ã£o do Card"
+          type: "number"
+          format: "double"
+        order:
+          description: "order"
+          type: "integer"
+          format: "int64"
+        currentResponsibleCode:
+          description: "current Responsible Code"
+          type: "integer"
+          format: "int32"
+        currentResponsibleName:
+          description: "current Responsible Name"
+          type: "string"
+        servedCode:
+          description: "served Code"
+          type: "integer"
+          format: "int32"
+        servedName:
+          description: "served Name"
+          type: "string"
+        TimeSpent:
+          description: "Time Spent"
+          type: "integer"
+          format: "int64"
+        priority:
+          description: "priority"
+          type: "integer"
+          format: "int32"
+        complexity:
+          description: "complexity"
+          type: "integer"
+          format: "int32"
+        orderNumber:
+          description: "Nro da Ordem"
+          type: "integer"
+          format: "int64"
+
+        Badges:
+          type: array
+          items:
+            description: Badge
+            $ref: "#/components/schemas/CRUD.SAC.Occurrence.Core.Handmade.Kanban.Cards.Badges_Badge"
+
+        ExtraData:
+          type: array
+          items:
+            description: ExtraData
+            $ref: "#/components/schemas/CRUD.SAC.Occurrence.Core.Handmade.Kanban.Cards.ExtraData_ExtraData"
+
+      x-gx-level: "Kanban"
+
+    CRUD.SAC.Occurrence.Core.Handmade.Kanban.Cards.Badges_Badge:
+      properties:
+        description:
+          description: "DescriÃ§Ã£o"
+          type: "string"
+        position:
+          description: "R-right | L-left | C-center"
+          type: "string"
+        code:
+          description: "code"
+          type: "integer"
+          format: "int64"
+
+
+      x-gx-level: "Kanban.Cards"
+
+
+    CRUD.SAC.Occurrence.Core.Handmade.Kanban.Cards.ExtraData_ExtraData:
+      properties:
+        Key:
+          description: "Key"
+          type: "string"
+        Value:
+          description: "Value"
+          type: "string"
+
+
+      x-gx-level: "Kanban.Cards"
+
+
+    CRUD.SAC.Occurrence.Core.Handmade.Kanban.ExtraData_ExtraData:
+      properties:
+        Key:
+          description: "Key"
+          type: "string"
+        Value:
+          description: "Value"
+          type: "string"
+
+
+      x-gx-level: "Kanban"
+
+    CRUD.Work.Core.Handmade.Response_CollaboratorActivityTimeNote:
+      properties:
+        TotalHours:
+          description: "Total de horas"
+          type: "integer"
+          format: "int64"
+        TotalMinutes:
+          description: "Total de minutos"
+          type: "integer"
+          format: "int64"
+        TotalSeconds:
+          description: "Total de segundos"
+          type: "integer"
+          format: "int64"
+        Messages:
+          description: "Messages"
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneXus.Common.Messages_Message"
+
+        ActivityTimeNotes:
+          type: array
+          items:
+            description: ActivityTimeNote
+            $ref: "#/components/schemas/CRUD.Work.Core.Handmade.Response_CollaboratorActivityTimeNote.ActivityTimeNotes_ActivityTimeNote"
+
+
+    CRUD.Work.Core.Handmade.Response_CollaboratorActivityTimeNote.ActivityTimeNotes_ActivityTimeNote:
+      properties:
+        Code:
+          description: "CÃ³digo da Nota de tempo da atividade"
+          type: "integer"
+          format: "int64"
+        ActivityCode:
+          description: "CÃ³digo da Atividade"
+          type: "integer"
+          format: "int64"
+        ActivityTitle:
+          description: "Titulo"
+          type: "string"
+        WorkflowStagesCode:
+          description: "CÃ³digo do estÃ¡gio do fluxo de trabalho"
+          type: "integer"
+          format: "int64"
+        WorkflowStagesDescription:
+          description: "DescriÃ§Ã£o do EstÃ¡gio do Fluxo de trabalho"
+          type: "string"
+        CollaboratorCode:
+          description: "CÃ³digo do Colaborador"
+          type: "integer"
+          format: "int64"
+        CollaboratorFullName:
+          description: "Nome Completo"
+          type: "string"
+        Start:
+          description: "InicÃ­o"
+          type: "string"
+          format: "date-time"
+        End:
+          description: "Fim"
+          type: "string"
+          format: "date-time"
+        Duration:
+          description: "DuraÃ§Ã£o"
+          type: "integer"
+          format: "int64"
+        Status:
+          description: "Status"
+          type: "integer"
+          format: "int32"
+        UserModification:
+          description: "UsuÃ¡rio de modificaÃ§Ã£o"
+          type: "string"
+          format: "uuid"
+        Guid:
+          description: "Chave candidata da Nota de tempo da atividade"
+          type: "string"
+          format: "uuid"
+
+
+      x-gx-level: "Response_CollaboratorActivityTimeNote"
+
+    CRUDv4.Work.React.Handmade.ActivityTimeNoteCompleteIn:
+      properties:
+        Code:
+          description: "CÃ³digo da Nota de tempo da atividade"
+          type: "integer"
+          format: "int64"
+        ActivityCode:
+          description: "CÃ³digo da Atividade"
+          type: "integer"
+          format: "int64"
+        WorkflowStagesCode:
+          description: "CÃ³digo do estÃ¡gio do fluxo de trabalho"
+          type: "integer"
+          format: "int64"
+        CollaboratorCode:
+          description: "CÃ³digo do Colaborador"
+          type: "integer"
+          format: "int64"
+        Start:
+          description: "InicÃ­o"
+          type: "string"
+          format: "date-time"
+        End:
+          description: "Fim"
+          type: "string"
+          format: "date-time"
+        Status:
+          description: "Status"
+          type: "integer"
+          format: "int32"
+        Guid:
+          description: "Chave candidata da Nota de tempo da atividade"
+          type: "string"
+          format: "uuid"
+
+
+
+    CRUD.Work.Core.Handmade.TransferActivities:
+      properties:
+        TransferType:
+          description: "Transfer Type"
+          type: "integer"
+          format: "int32"
+        FromPersonCode:
+          description: "CÃ³digo da Pessoa"
+          type: "integer"
+          format: "int64"
+        ToPersonCode:
+          description: "CÃ³digo da Pessoa"
+          type: "integer"
+          format: "int64"
+
+
+
+    GeneXus.Common.Messages_Message:
+      properties:
+        Id:
+          description: "Id"
+          type: "string"
+        Type:
+          description: "Type"
+          type: "integer"
+          format: "int32"
+        Description:
+          description: "Description"
+          type: "string"
+
+
+
+ 

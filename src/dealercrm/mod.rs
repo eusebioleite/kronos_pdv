@@ -1,70 +1,82 @@
 use anyhow::{Context, Result};
-use serde::Serialize;
-use serde::ser::SerializeStruct;
 use sqlx::mysql::MySqlPoolOptions;
 use sqlx::{FromRow, MySqlPool};
+use std::sync::OnceLock;
 
 #[derive(Debug, Clone, FromRow)]
-#[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct Activity {
+    #[sqlx(rename = "Activity_Code")]
     pub activity_code: i64,
+    #[sqlx(rename = "Activity_Guid")]
     pub activity_guid: String,
-    pub activity_script: Option<String>,
+    #[sqlx(rename = "Activity_Title")]
     pub activity_title: Option<String>,
-    pub activity_problem: Option<String>,
-    pub activity_objective: Option<String>,
+    #[sqlx(rename = "Activity_Detail")]
     pub activity_detail: Option<String>,
+    #[sqlx(rename = "Activity_FunctionalRequirements")]
     pub activity_functional_requirements: Option<String>,
+    #[sqlx(rename = "Activity_BusinessRule")]
     pub activity_business_rule: Option<String>,
-    pub title: Option<String>,
-    pub activity_planned_date: Option<chr9o>,
-    pub activity_replanned_date: Option<String>,
-    pub activity_workflow_stages_code: i64,
-    pub workflow_stages_code: i64,
-    pub workflow_stages_description: Option<String>,
+    #[sqlx(rename = "Activity_PlannedDate")]
+    pub activity_planned_date: Option<chrono::NaiveDate>,
 }
 
-pub async fn init_pool() -> Result<MySqlPool> {
-    MySqlPoolOptions::new()
+static MYSQL_POOL: OnceLock<MySqlPool> = OnceLock::new();
+
+/// Returns a reference to the global MySQL connection pool.
+/// Panics if called before `dealercrm::init_pool()`.
+pub fn get_pool() -> &'static MySqlPool {
+    MYSQL_POOL
+        .get()
+        .expect("dealercrm::init_pool() must be called before get_pool()")
+}
+
+pub async fn init_pool() -> Result<()> {
+    let cfg = &crate::config::get().config.mysql;
+    let url = format!(
+        "mysql://{}:{}@{}:{}/{}",
+        urlencoding::encode(&cfg.user),
+        urlencoding::encode(&cfg.password),
+        cfg.host,
+        cfg.port,
+        cfg.database,
+    );
+
+    let pool = MySqlPoolOptions::new()
         .max_connections(5)
-        .connect("mysql://dealercrm:123456@localhost:3306/dealercrm")
+        .connect(&url)
         .await
-        .context("Failed to connect to MySQL DealerCRM")
+        .context("Failed to connect to MySQL DealerCRM")?;
+    MYSQL_POOL
+        .set(pool)
+        .map_err(|_| anyhow::anyhow!("dealercrm::init_pool() was called more than once"))?;
+    Ok(())
 }
 
-pub async fn fetch_activities(
-    pool: &MySqlPool,
-    order_code: &str,
-    schedule_code: i64,
-) -> Result<Vec<Activity>> {
+pub async fn fetch_activities(order_code: &str) -> Result<Vec<Activity>> {
+    let pool = get_pool();
     let query_str = "
-        select
-            Activity_Code, 
-            Activity_Guid,
-            Activity_Title,
-            Activity_Detail,  
-            Activity_Problem,
-            Activity_Script,
-            Activity_Objective,
-            Activity_FunctionalRequirements, 
-            Activity_BusinessRule, 
-            Activity_PlannedDate, 
-            Activity_ReplannedDate,
-            ActivityWorkflowStages_Code,
-            WorkflowStages_Code,
-            WorkflowStages_Description
-        from Activity 
-        join ActivityWorkflowStages on ActivityWorkflowStages_ActivityCode       = Activity_Code 
-        join WorkflowStages         on ActivityWorkflowStages_WorkflowStagesCode = WorkflowStages_Code 
-        WHERE ActivityFunctionalRequirements = ?
-        AND Activity_BusinessRule = ?
+        SELECT DISTINCT
+            a.Activity_Code, 
+            a.Activity_Guid,
+            a.Activity_Title,
+            a.Activity_Detail,  
+            a.Activity_FunctionalRequirements, 
+            a.Activity_BusinessRule, 
+            a.Activity_PlannedDate
+        FROM Activity a
+        JOIN ActivityWorkflowStages aws ON aws.ActivityWorkflowStages_ActivityCode = a.Activity_Code 
+        JOIN WorkflowStages ws          ON aws.ActivityWorkflowStages_WorkflowStagesCode = ws.WorkflowStages_Code 
+        WHERE a.Activity_FunctionalRequirements = ?
+          AND a.Activity_TupleExcluded = 0
     ";
 
     let activities = sqlx::query_as::<_, Activity>(query_str)
-        .bind((order_code, schedule_code))
+        .bind(order_code)
         .fetch_all(pool)
         .await
-        .with_context(|| format!("Failed to fetch activities for order_code {order_code} and schedule_code {schedule_code}"))?;
+        .with_context(|| format!("Failed to fetch activities for order_code '{order_code}'"))?;
 
     Ok(activities)
 }

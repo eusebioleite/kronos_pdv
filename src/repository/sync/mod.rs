@@ -1,24 +1,25 @@
 use anyhow::{Context, Result};
-use sibyl::{Row, Session};
-use std::collections::HashMap;
+use chrono::NaiveDate;
+use sibyl::Row;
+use std::collections::{BTreeMap, HashMap};
 use tracing::info;
 
-use crate::api::{self, ActivityComplete};
-use crate::config::Config;
+use crate::api::{self, Activity, WorkflowStage};
+use crate::database;
 use crate::dealercrm;
 use crate::repository::queue::Queue;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub struct Order {
+pub struct Schedule {
     pub order_code: String,
     pub order_kind: String,
-    pub schedule_code: String,
+    pub schedule_code: i64,
     pub product_code: String,
     pub product_description: String,
     pub schedule_qtd: f64,
     pub product_bottle: f64,
-    pub schedule_date: chrono::NaiveDate,
+    pub schedule_date: NaiveDate,
     pub company_code: i32,
     pub product_type: i32,
     pub order_type: String,
@@ -26,12 +27,12 @@ pub struct Order {
     pub order_nature: String,
     pub nature_description: String,
     pub order_seller: String,
-    pub customer_code: i32,
+    pub customer_code: String,
     pub customer_name: String,
     pub customer_fantasy: String,
 }
 
-impl Order {
+impl Schedule {
     pub fn from_row(row: &Row<'_>) -> Result<Self> {
         Ok(Self {
             order_code: row
@@ -46,55 +47,74 @@ impl Order {
                 .get(2)
                 .context("Failed to read column 2 (prv_indice) from row")?,
             product_code: row
-                .get(3)
-                .context("Failed to read column 3 (prv_seqite) from row")?,
+                .get::<Option<String>, _>(3)
+                .context("Failed to read column 3 (pro_codpro) from row")?
+                .unwrap_or_default(),
             product_description: row
-                .get(4)
-                .context("Failed to read column 4 (prv_codpro) from row")?,
+                .get::<Option<String>, _>(4)
+                .context("Failed to read column 4 (pro_descri) from row")?
+                .unwrap_or_default(),
             schedule_qtd: row
                 .get(5)
-                .context("Failed to read column 5 (prv_codnat) from row")?,
+                .context("Failed to read column 5 (prv_qtprog) from row")?,
             product_bottle: row
                 .get(6)
-                .context("Failed to read column 6 (nat_descri) from row")?,
-            schedule_date: row
-                .get(7)
-                .context("Failed to read column 7 (ped_codcli) from row")?,
+                .context("Failed to read column 6 (pro_qtdemb) from row")?,
+            schedule_date: {
+                let date_str: String = row
+                    .get::<Option<String>, _>(7)
+                    .context("Failed to read column 7 (prv_dtprog) from row")?
+                    .unwrap_or_default();
+                NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                    .with_context(|| format!("Failed to parse schedule_date '{date_str}'"))?
+            },
             company_code: row
                 .get(8)
-                .context("Failed to read column 8 (cli_razao) from row")?,
+                .context("Failed to read column 8 (pdv_codseg) from row")?,
             product_type: row
                 .get(9)
-                .context("Failed to read column 9 (prv_qtde) from row")?,
+                .context("Failed to read column 9 (product_type) from row")?,
             order_type: row
-                .get(10)
-                .context("Failed to read column 10 (order_type) from row")?,
+                .get::<Option<String>, _>(10)
+                .context("Failed to read column 10 (order_type) from row")?
+                .unwrap_or_default(),
             delivery_type: row
-                .get(11)
-                .context("Failed to read column 11 (delivery_type) from row")?,
+                .get::<Option<String>, _>(11)
+                .context("Failed to read column 11 (delivery_type) from row")?
+                .unwrap_or_default(),
             order_nature: row
-                .get(12)
-                .context("Failed to read column 12 (order_nature) from row")?,
+                .get::<Option<String>, _>(12)
+                .context("Failed to read column 12 (order_nature) from row")?
+                .unwrap_or_default(),
             nature_description: row
-                .get(13)
-                .context("Failed to read column 13 (nature_description) from row")?,
+                .get::<Option<String>, _>(13)
+                .context("Failed to read column 13 (nature_description) from row")?
+                .unwrap_or_default(),
             order_seller: row
-                .get(14)
-                .context("Failed to read column 14 (order_seller) from row")?,
+                .get::<Option<String>, _>(14)
+                .context("Failed to read column 14 (order_seller) from row")?
+                .unwrap_or_default(),
             customer_code: row
                 .get(15)
                 .context("Failed to read column 15 (customer_code) from row")?,
             customer_name: row
-                .get(16)
-                .context("Failed to read column 16 (customer_name) from row")?,
+                .get::<Option<String>, _>(16)
+                .context("Failed to read column 16 (customer_name) from row")?
+                .unwrap_or_default(),
             customer_fantasy: row
-                .get(17)
-                .context("Failed to read column 17 (customer_fantasy) from row")?,
+                .get::<Option<String>, _>(17)
+                .context("Failed to read column 17 (customer_fantasy) from row")?
+                .unwrap_or_default(),
         })
     }
 }
 
-pub async fn build_cards(session: &Session<'_>, order_code: &str) -> Result<Vec<ActivityComplete>> {
+pub async fn get_new_cards(order_code: &str) -> Result<Vec<Activity>> {
+    let session = database::get_pool()
+        .get_session()
+        .await
+        .context("Failed to get Oracle session from pool")?;
+
     let sql = "
         SELECT 
             pdv_numped AS order_code,
@@ -104,7 +124,7 @@ pub async fn build_cards(session: &Session<'_>, order_code: &str) -> Result<Vec<
             pro_descri AS product_description,
             prv_qtprog AS schedule_qtd,
             pro_qtdemb AS product_bottle,
-            prv_dtprog AS schedule_date,
+            TO_CHAR(prv_dtprog, 'YYYY-MM-DD') AS schedule_date,
             COALESCE(pdv_codseg, 100) AS company_code,
             CASE
                 WHEN UPPER(pro_descri) LIKE '%FRASCO%' AND UPPER(nat_descri) LIKE '%AMOSTRA%' THEN 4
@@ -131,244 +151,255 @@ pub async fn build_cards(session: &Session<'_>, order_code: &str) -> Result<Vec<
             pdv_codemp AS customer_code,
             emp_erazao AS customer_name,
             emp_nfanta AS customer_fantasy
-            FROM f_prgven
-            JOIN f_pedvenda    ON prv_numped = pdv_numped
-            LEFT JOIN f_cdemp  ON pdv_codemp = emp_codemp
-            LEFT JOIN f_natope ON pdv_indnat = nat_indice
-            LEFT JOIN f_prods  ON prv_codpro = pro_codpro
+        FROM f_prgven
+        JOIN f_pedvenda    ON prv_numped = pdv_numped
+        LEFT JOIN f_cdemp  ON pdv_codemp = emp_codemp
+        LEFT JOIN f_natope ON pdv_indnat = nat_indice
+        LEFT JOIN f_prods  ON prv_codpro = pro_codpro
         WHERE pdv_numped = :1
+        ORDER BY prv_dtprog, prv_indice
     ";
 
     let stmt = session
         .prepare(sql)
         .await
-        .context("Failed to prepare build_cards SQL statement")?;
+        .context("Failed to prepare get_new_cards SQL statement")?;
+
     let rows = stmt
         .query(order_code)
         .await
-        .with_context(|| format!("Failed to query order details for order '{}'", order_code))?;
+        .with_context(|| format!("Failed to query schedules for order '{order_code}'"))?;
 
-    let mut orders = Vec::new();
+    let mut schedules: Vec<Schedule> = Vec::new();
     while let Some(row) = rows
         .next()
         .await
-        .with_context(|| format!("Failed to fetch next order row for order '{}'", order_code))?
+        .with_context(|| format!("Failed to fetch next schedule row for order '{order_code}'"))?
     {
-        orders.push(
-            Order::from_row(&row)
-                .with_context(|| format!("Failed to parse row for order '{}'", order_code))?,
+        schedules.push(
+            Schedule::from_row(&row).with_context(|| {
+                format!("Failed to parse schedule row for order '{order_code}'")
+            })?,
         );
     }
 
-    // Config defaults should ideally be passed, but we'll mock them for ActivityComplete
+    if schedules.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Group by schedule_date (BTreeMap preserves sorted date order)
+    let mut groups: BTreeMap<NaiveDate, Vec<Schedule>> = BTreeMap::new();
+    for s in schedules {
+        groups.entry(s.schedule_date).or_default().push(s);
+    }
+
+    let root_config = crate::config::get();
     let mut cards = Vec::new();
 
-    // Grouping logic (PDV-A grouped by date, PDV-F grouped into one)
-    let mut grouped: HashMap<String, Vec<Order>> = HashMap::new();
-
-    for order in orders {
-        let key = if order.order_kind == "PDV-A" {
-            order
-                .delivery_date
-                .clone()
-                .unwrap_or_else(|| "1970-01-01".to_string())
-        } else {
-            "ALL".to_string()
-        };
-        grouped.entry(key).or_default().push(order);
-    }
-
-    for (date_key, group) in grouped {
+    for (date, group) in groups {
         let first = &group[0];
         let title = format!(
-            "Pedido {} - Cliente {}",
-            first.order_code,
-            first.customer_name.as_deref().unwrap_or("")
+            "PDV {} | {}",
+            first.order_code.trim_start_matches('0'),
+            first.customer_name
         );
-        let func_req = if first.order_kind == "PDV-A" {
-            format!("ERP-{}-{}", first.order_code, date_key)
-        } else {
-            format!("ERP-{}-FECHADO", first.order_code)
+        let detail = build_detail(&group);
+        let type_activity_code = first.product_type as i64;
+        let schedule_codes: Vec<i64> = group.iter().map(|s| s.schedule_code).collect();
+        let business_rule =
+            serde_json::to_string(&schedule_codes).unwrap_or_else(|_| "[]".to_string());
+
+        let default_col =
+            root_config.get_column_by_company(first.company_code as u32, "PEDIDO EM CARTEIRA");
+        let requester_code = root_config
+            .get_requester_by_name(&first.order_seller)
+            .map(|r| r.code)
+            .unwrap_or_else(|| root_config.default_requester_code());
+
+        let product_kind = match first.product_type {
+            2 | 4 | 7 => "FRASCO",
+            _ => "PREFORMA",
         };
 
-        let mut detail = String::new();
-        for item in &group {
-            detail.push_str(&format!(
-                "Item: {} Qtd: {}\n",
-                item.item_code.as_deref().unwrap_or(""),
-                item.quantity.unwrap_or(0.0)
-            ));
-        }
+        let responsible_code = if let (Some(col), Some(comp)) = (
+            default_col,
+            root_config
+                .company
+                .values()
+                .find(|c| c.code == first.company_code as u32),
+        ) {
+            root_config.get_responsible(comp, col, requester_code, product_kind)
+        } else {
+            requester_code
+        };
 
-        cards.push(ActivityComplete {
-            code: None,
-            process_id: 1, // These should come from config
+        let stage_code = default_col.map(|c| c.code as i64);
+
+        let workflow_stages = Some(vec![WorkflowStage {
+            workflow_stages_code: stage_code,
+            code: stage_code,
+            order: Some(0),
+            order_to: Some(0),
+            requester_person_code: Some(requester_code as i64),
+            responsible_person_code: Some(responsible_code as i64),
+        }]);
+
+        cards.push(Activity {
+            guid: None, // set by update_card when PATCHing an existing card
             title,
             detail,
-            planned_date: if date_key == "ALL" {
-                "1970-01-01".to_string()
-            } else {
-                date_key
-            },
-            functional_requirements: func_req,
-            requester_id: 1, // From config
-            seller_id: 1,    // From config
-            company_id: 1,   // From config
-            department_id: None,
-            custom_fields: vec![],
+            type_activity_code,
+            planned_date: date,
+            replanned_date: date,
+            objective: first.delivery_type.clone(),
+            script: first.customer_fantasy.clone(),
+            functional_requirements: first.order_code.clone(),
+            business_rule,
+            workflow_stages,
         });
     }
 
     Ok(cards)
 }
 
-pub async fn sync_queue(
-    session: &Session<'_>,
-    card: &Queue,
-    config: &Config,
-    mysql_pool: &sqlx::MySqlPool,
-    api_client: &reqwest_middleware::ClientWithMiddleware,
-) -> Result<()> {
-    if card.status == "EXCLUIR" {
-        delete_cards(card.pedido.clone(), mysql_pool, config, api_client)
-            .await
-            .with_context(|| format!("Failed to delete CRM cards for pedido '{}'", card.pedido))?;
-        crate::repository::queue::update_status(session, "EXCLUIDO", card)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to update queue status to EXCLUIDO for pedido '{}'",
-                    card.pedido
-                )
-            })?;
-        return Ok(());
-    }
+pub fn build_detail(schedules: &[Schedule]) -> String {
+    let mut detail = String::new();
 
-    let new_cards = build_cards(session, &card.pedido).await.with_context(|| {
-        format!(
-            "Failed to build new cards from Oracle for pedido '{}'",
-            card.pedido
-        )
-    })?;
+    for s in schedules {
+        let schedule_code = s.schedule_code;
+        let schedule_qtd = s.schedule_qtd;
+        let product_bottle = s.product_bottle;
+        let product_code = &s.product_code;
+        let product_description = &s.product_description;
 
-    sync_cards(&card.pedido, desired_cards, mysql_pool, config, api_client)
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to sync cards to DealerCRM/API for pedido '{}'",
-                card.pedido
-            )
-        })?;
+        detail.push_str(&format!(
+            "• <strong>📋 Índice:</strong> <em>{schedule_code}</em><br>\n"
+        ));
+        detail.push_str(&format!(
+            "• <strong>📦 Produto:</strong> <em>{product_code} | {product_description}</em><br>\n"
+        ));
+        detail.push_str("• <strong>🔢 Quantidade:</strong> <em>");
 
-    crate::repository::queue::update_status(session, "SUCESSO", card)
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to update queue status to SUCESSO for pedido '{}'",
-                card.pedido
-            )
-        })?;
-
-    Ok(())
-}
-
-async fn sync_cards(
-    order_code: &str,
-    desired_cards: Vec<ActivityComplete>,
-    mysql_pool: &sqlx::MySqlPool,
-    config: &Config,
-    api_client: &reqwest_middleware::ClientWithMiddleware,
-) -> Result<()> {
-    let existing_activities = dealercrm::fetch_activities(mysql_pool, order_code)
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to fetch existing CRM activities for order '{}'",
-                order_code
-            )
-        })?;
-
-    // Create a map of existing activities by functional_requirements
-    let mut existing_map: HashMap<String, dealercrm::Activity> = HashMap::new();
-    for act in existing_activities {
-        if let Some(req) = &act.functional_requirements {
-            existing_map.insert(req.clone(), act);
-        }
-    }
-
-    for mut desired in desired_cards {
-        if let Some(existing) = existing_map.remove(&desired.functional_requirements) {
-            desired.code = Some(existing.code);
-            api::update_card(api_client, config, existing.code, &desired)
-                .await
-                .with_context(|| {
-                    format!(
-                        "Failed to update API card {} for order '{}'",
-                        existing.code, order_code
-                    )
-                })?;
-            info!("Updated card {} for order {}", existing.code, order_code);
+        if product_bottle == 0.0 {
+            detail.push_str(&format!("{schedule_qtd} unidades no total."));
         } else {
-            api::new_card(api_client, config, &desired)
-                .await
-                .with_context(|| {
-                    format!(
-                        "Failed to create API card for order '{}' ({})",
-                        order_code, desired.functional_requirements
-                    )
-                })?;
-            info!(
-                "Created new card for order {} ({})",
-                order_code, desired.functional_requirements
-            );
+            let boxes = (schedule_qtd / product_bottle).floor();
+            let surplus = schedule_qtd % product_bottle;
+
+            if boxes == 0.0 {
+                detail.push_str(&format!("1 volume com {schedule_qtd} unidades no total."));
+            } else if surplus > 0.0 {
+                detail.push_str(&format!(
+                    "{boxes} volumes de {product_bottle} unidades + 1 volume com {surplus} unidades ({schedule_qtd} unidades no total).\n"
+                ));
+            } else {
+                detail.push_str(&format!(
+                    "{boxes} volumes de {product_bottle} unidades ({schedule_qtd} unidades no total).\n"
+                ));
+            }
+        }
+
+        detail.push_str("</em><br><br>\n");
+    }
+
+    detail
+}
+
+pub async fn sync_queue(item: &Queue) -> Result<()> {
+    let order_code = &item.order_code;
+
+    // 1. Fetch ground truth from Oracle (grouped by schedule_date)
+    let new_cards = get_new_cards(order_code)
+        .await
+        .with_context(|| format!("Failed to get new cards from Oracle for order '{order_code}'"))?;
+
+    // 2. Fetch current activities from DealerCRM MySQL
+    let activities = dealercrm::fetch_activities(order_code)
+        .await
+        .with_context(|| format!("Failed to fetch CRM activities for order '{order_code}'"))?;
+
+    // 3. Build lookup maps keyed by planned_date
+    let mut activities_map: HashMap<NaiveDate, Vec<dealercrm::Activity>> = HashMap::new();
+    for act in activities {
+        if let Some(date) = act.activity_planned_date {
+            activities_map.entry(date).or_default().push(act);
         }
     }
 
-    // Any remaining in existing_map should be deleted (they are no longer part of the order)
-    for (req, obsolete) in existing_map {
-        api::delete_card(api_client, config, obsolete.code)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to delete obsolete API card {} for order '{}' ({})",
-                    obsolete.code, order_code, req
-                )
+    let new_cards_map: HashMap<NaiveDate, Activity> =
+        new_cards.into_iter().map(|c| (c.planned_date, c)).collect();
+
+    // 4a. POST: date exists in Oracle (new_cards) but not in DealerCRM (activities)
+    for (date, new_card) in &new_cards_map {
+        if !activities_map.contains_key(date) {
+            info!("POST new card for order '{order_code}' on date {date}");
+            api::new_card(new_card).await.with_context(|| {
+                format!("Failed to POST new card for order '{order_code}' on date {date}")
             })?;
-        info!(
-            "Deleted obsolete card {} for order {} ({})",
-            obsolete.code, order_code, req
-        );
+        }
     }
 
-    Ok(())
-}
+    // 4b. PATCH: date exists in both Oracle and DealerCRM (overwrite primary, cleanup surplus duplicates)
+    for (date, new_card) in &new_cards_map {
+        if let Some(acts) = activities_map.get(date) {
+            if let Some(primary) = acts.first() {
+                info!(
+                    "PATCH card with guid {} for order '{order_code}' on date {date}",
+                    primary.activity_guid
+                );
+                api::update_card(&primary.activity_guid, new_card)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to PATCH card {} for order '{order_code}' on date {date}",
+                            primary.activity_guid
+                        )
+                    })?;
+            }
 
-async fn delete_cards(
-    order_code: String,
-    mysql_pool: &sqlx::MySqlPool,
-    config: &Config,
-    api_client: &reqwest_middleware::ClientWithMiddleware,
-) -> Result<()> {
-    let existing_activities = dealercrm::fetch_activities(mysql_pool, &order_code)
+            // If there are duplicate cards in DealerCRM on the same date, clean them up
+            for duplicate in acts.iter().skip(1) {
+                info!(
+                    "DELETE duplicate card with guid {} for order '{order_code}' on date {date}",
+                    duplicate.activity_guid
+                );
+                api::delete_card(&duplicate.activity_guid)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to DELETE duplicate card {} for order '{order_code}' on date {date}",
+                            duplicate.activity_guid
+                        )
+                    })?;
+            }
+        }
+    }
+
+    // 4c. DELETE: date exists in DealerCRM but no longer in Oracle
+    for (date, acts) in &activities_map {
+        if !new_cards_map.contains_key(date) {
+            for obsolete in acts {
+                info!(
+                    "DELETE obsolete card with guid {} for order '{order_code}' on date {date}",
+                    obsolete.activity_guid
+                );
+                api::delete_card(&obsolete.activity_guid)
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to DELETE card {} for order '{order_code}' on date {date}",
+                            obsolete.activity_guid
+                        )
+                    })?;
+            }
+        }
+    }
+
+    // 5. Mark row as synced
+    crate::repository::queue::mark_sync(order_code)
         .await
-        .with_context(|| {
-            format!(
-                "Failed to fetch existing CRM activities for order '{}' to delete",
-                order_code
-            )
-        })?;
+        .with_context(|| format!("Failed to mark_sync for order '{order_code}'"))?;
 
-    for act in existing_activities {
-        api::delete_card(api_client, config, act.code)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to delete card {} for order '{}'",
-                    act.code, order_code
-                )
-            })?;
-        info!("Deleted card {} for order {}", act.code, order_code);
-    }
-
+    info!("Successfully synchronized order '{order_code}'.");
     Ok(())
 }
