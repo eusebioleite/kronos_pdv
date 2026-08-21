@@ -1,10 +1,10 @@
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
 use sibyl::Row;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashSet};
 use tracing::info;
 
-use crate::api::{self, Activity, WorkflowStage};
+use crate::api::{self, Activity, ApiAttachment, ApiChat, WorkflowStage};
 use crate::database;
 use crate::dealercrm;
 use crate::repository::queue::Queue;
@@ -256,6 +256,9 @@ pub async fn get_new_cards(order_code: &str) -> Result<Vec<Activity>> {
             functional_requirements: first.order_code.clone(),
             business_rule,
             workflow_stages,
+            problem: None,
+            chats: None,
+            attachments: None,
         });
     }
 
@@ -305,6 +308,143 @@ pub fn build_detail(schedules: &[Schedule]) -> String {
     detail
 }
 
+/// Merges user-generated fields from all CRM activities sharing the same planned_date.
+///
+/// - Problem: values joined with "\n---\n" (blank/None values are skipped).
+/// - Chats: concatenated in per-activity order. Primary card's chats keep their GUID;
+///   secondary card's chats have their GUID omitted (None) to avoid cross-parent update errors in CRM.
+/// - Attachments: concatenated, deduped by GUID. Primary attachments keep their GUID;
+///   secondary attachments have GUID omitted (None).
+fn merge_user_data(
+    acts: &[dealercrm::Activity],
+    anchor_guid: &str,
+) -> (Option<String>, Vec<ApiChat>, Vec<ApiAttachment>) {
+    let mut problem_parts: Vec<&str> = Vec::new();
+    let mut chats: Vec<ApiChat> = Vec::new();
+    let mut attachments: Vec<ApiAttachment> = Vec::new();
+    let mut seen_guids = std::collections::HashSet::<String>::new();
+
+    for act in acts {
+        let is_primary = act.activity_guid == anchor_guid;
+
+        if let Some(p) = &act.activity_problem {
+            let trimmed = p.trim();
+            if !trimmed.is_empty() {
+                problem_parts.push(trimmed);
+            }
+        }
+        for c in &act.chats {
+            chats.push(ApiChat {
+                guid: if is_primary {
+                    Some(c.activity_chat_guid.clone())
+                } else {
+                    None
+                },
+                person_code: c.activity_chat_person_code,
+                text: c.activity_chat_text.clone(),
+                comment_date: c
+                    .activity_chat_comment_date
+                    .format("%Y-%m-%dT%H:%M:%S")
+                    .to_string(),
+            });
+        }
+        for a in &act.attachments {
+            if seen_guids.insert(a.activity_attachment_guid.clone()) {
+                attachments.push(ApiAttachment {
+                    guid: if is_primary {
+                        Some(a.activity_attachment_guid.clone())
+                    } else {
+                        None
+                    },
+                    description: a.activity_attachment_description.clone(),
+                });
+            }
+        }
+    }
+
+    let merged_problem = if problem_parts.is_empty() {
+        None
+    } else {
+        Some(problem_parts.join("\n---\n"))
+    };
+
+    (merged_problem, chats, attachments)
+}
+
+/// Helper to extract schedule_codes from the JSON string stored in `business_rule`
+fn parse_schedule_codes(raw: Option<&str>) -> HashSet<i64> {
+    raw.and_then(|s| serde_json::from_str::<Vec<i64>>(s).ok())
+        .map(|v| v.into_iter().collect())
+        .unwrap_or_default()
+}
+
+/// Measures distance to arrival for a given date relative to `today`.
+/// Returns (priority, diff):
+/// - Upcoming / Today: (0, days_from_today_ascending) -> closest to arrive
+/// - Past: (1, days_ago_ascending) -> closest to today among past dates
+fn date_distance_to_arrival(date: NaiveDate, today: NaiveDate) -> (i64, i64) {
+    let diff = (date - today).num_days();
+    if diff >= 0 {
+        (0, diff)
+    } else {
+        (1, -diff)
+    }
+}
+
+/// Maps existing DealerCRM activities to new Oracle cards.
+/// Returns a `Vec<Vec<dealercrm::Activity>>` of length `new_cards.len()`,
+/// where index `i` contains all CRM activities that should be merged into `new_cards[i]`.
+fn map_activities_to_new_cards(
+    crm_acts: Vec<dealercrm::Activity>,
+    new_cards: &[Activity],
+    today: NaiveDate,
+) -> Vec<Vec<dealercrm::Activity>> {
+    if new_cards.is_empty() {
+        return Vec::new();
+    }
+
+    let new_card_items: Vec<HashSet<i64>> = new_cards
+        .iter()
+        .map(|c| parse_schedule_codes(Some(&c.business_rule)))
+        .collect();
+
+    let mut buckets: Vec<Vec<dealercrm::Activity>> = vec![Vec::new(); new_cards.len()];
+
+    for act in crm_acts {
+        let act_items = parse_schedule_codes(act.activity_business_rule.as_deref());
+
+        let mut best_intersection = 0;
+        let mut candidate_indices = Vec::new();
+
+        for (idx, items) in new_card_items.iter().enumerate() {
+            let intersection = act_items.intersection(items).count();
+            if intersection > best_intersection {
+                best_intersection = intersection;
+                candidate_indices.clear();
+                candidate_indices.push(idx);
+            } else if intersection == best_intersection && intersection > 0 {
+                candidate_indices.push(idx);
+            }
+        }
+
+        // If no schedule items intersected (e.g. items replaced/deleted, or empty business_rule),
+        // all new cards are candidates, and the tie is broken by closest to arrive.
+        if candidate_indices.is_empty() {
+            candidate_indices = (0..new_cards.len()).collect();
+        }
+
+        // From candidate indices, pick the one with planned_date closest to arrive
+        let chosen_idx = candidate_indices
+            .into_iter()
+            .min_by_key(|&idx| date_distance_to_arrival(new_cards[idx].planned_date, today))
+            .unwrap_or(0);
+
+        buckets[chosen_idx].push(act);
+    }
+
+    buckets
+}
+
 pub async fn sync_queue(item: &Queue) -> Result<()> {
     let order_code = &item.order_code;
 
@@ -318,77 +458,89 @@ pub async fn sync_queue(item: &Queue) -> Result<()> {
         .await
         .with_context(|| format!("Failed to fetch CRM activities for order '{order_code}'"))?;
 
-    // 3. Build lookup maps keyed by planned_date
-    let mut activities_map: HashMap<NaiveDate, Vec<dealercrm::Activity>> = HashMap::new();
-    for act in activities {
-        if let Some(date) = act.activity_planned_date {
-            activities_map.entry(date).or_default().push(act);
+    // If order was cancelled / has no new cards in Oracle, delete all remaining CRM cards
+    if new_cards.is_empty() {
+        for obsolete in activities {
+            info!(
+                "DELETE obsolete card with guid {} for order '{order_code}'",
+                obsolete.activity_guid
+            );
+            api::delete_card(&obsolete.activity_guid)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to DELETE card {} for order '{order_code}'",
+                        obsolete.activity_guid
+                    )
+                })?;
         }
+        crate::repository::queue::mark_sync(order_code)
+            .await
+            .with_context(|| format!("Failed to mark_sync for order '{order_code}'"))?;
+        info!("Successfully synchronized order '{order_code}'.");
+        return Ok(());
     }
 
-    let new_cards_map: HashMap<NaiveDate, Activity> =
-        new_cards.into_iter().map(|c| (c.planned_date, c)).collect();
+    let today = chrono::Local::now().naive_local().date();
+    let buckets = map_activities_to_new_cards(activities, &new_cards, today);
 
-    // 4a. POST: date exists in Oracle (new_cards) but not in DealerCRM (activities)
-    for (date, new_card) in &new_cards_map {
-        if !activities_map.contains_key(date) {
-            info!("POST new card for order '{order_code}' on date {date}");
-            api::new_card(new_card).await.with_context(|| {
-                format!("Failed to POST new card for order '{order_code}' on date {date}")
+    for (new_card, acts) in new_cards.into_iter().zip(buckets) {
+        if acts.is_empty() {
+            // POST new card
+            info!(
+                "POST new card for order '{order_code}' on date {}",
+                new_card.planned_date
+            );
+            api::new_card(&new_card).await.with_context(|| {
+                format!(
+                    "Failed to POST new card for order '{order_code}' on date {}",
+                    new_card.planned_date
+                )
             })?;
-        }
-    }
+        } else {
+            // Primary card is the first one in the bucket
+            let primary = &acts[0];
+            let (merged_problem, merged_chats, merged_attachments) =
+                merge_user_data(&acts, &primary.activity_guid);
 
-    // 4b. PATCH: date exists in both Oracle and DealerCRM (overwrite primary, cleanup surplus duplicates)
-    for (date, new_card) in &new_cards_map {
-        if let Some(acts) = activities_map.get(date) {
-            if let Some(primary) = acts.first() {
-                info!(
-                    "PATCH card with guid {} for order '{order_code}' on date {date}",
-                    primary.activity_guid
-                );
-                api::update_card(&primary.activity_guid, new_card)
-                    .await
-                    .with_context(|| {
-                        format!(
-                            "Failed to PATCH card {} for order '{order_code}' on date {date}",
-                            primary.activity_guid
-                        )
-                    })?;
-            }
+            let mut card_to_patch = new_card.clone();
+            card_to_patch.problem = merged_problem;
+            card_to_patch.chats = if merged_chats.is_empty() {
+                None
+            } else {
+                Some(merged_chats)
+            };
+            card_to_patch.attachments = if merged_attachments.is_empty() {
+                None
+            } else {
+                Some(merged_attachments)
+            };
 
-            // If there are duplicate cards in DealerCRM on the same date, clean them up
+            info!(
+                "PATCH card with guid {} for order '{order_code}' on date {}",
+                primary.activity_guid, card_to_patch.planned_date
+            );
+            api::update_card(&primary.activity_guid, &card_to_patch)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to PATCH card {} for order '{order_code}' on date {}",
+                        primary.activity_guid, card_to_patch.planned_date
+                    )
+                })?;
+
+            // Clean up surplus/merged CRM cards
             for duplicate in acts.iter().skip(1) {
                 info!(
-                    "DELETE duplicate card with guid {} for order '{order_code}' on date {date}",
+                    "DELETE duplicate/merged card with guid {} for order '{order_code}'",
                     duplicate.activity_guid
                 );
                 api::delete_card(&duplicate.activity_guid)
                     .await
                     .with_context(|| {
                         format!(
-                            "Failed to DELETE duplicate card {} for order '{order_code}' on date {date}",
+                            "Failed to DELETE merged card {} for order '{order_code}'",
                             duplicate.activity_guid
-                        )
-                    })?;
-            }
-        }
-    }
-
-    // 4c. DELETE: date exists in DealerCRM but no longer in Oracle
-    for (date, acts) in &activities_map {
-        if !new_cards_map.contains_key(date) {
-            for obsolete in acts {
-                info!(
-                    "DELETE obsolete card with guid {} for order '{order_code}' on date {date}",
-                    obsolete.activity_guid
-                );
-                api::delete_card(&obsolete.activity_guid)
-                    .await
-                    .with_context(|| {
-                        format!(
-                            "Failed to DELETE card {} for order '{order_code}' on date {date}",
-                            obsolete.activity_guid
                         )
                     })?;
             }
@@ -403,3 +555,177 @@ pub async fn sync_queue(item: &Queue) -> Result<()> {
     info!("Successfully synchronized order '{order_code}'.");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::{NaiveDate, NaiveDateTime};
+
+    fn make_test_activity(
+        code: i64,
+        guid: &str,
+        date: NaiveDate,
+        items: Vec<i64>,
+        problem: Option<&str>,
+    ) -> dealercrm::Activity {
+        dealercrm::Activity {
+            activity_code: code,
+            activity_guid: guid.to_string(),
+            activity_title: Some(format!("Title {code}")),
+            activity_detail: None,
+            activity_functional_requirements: None,
+            activity_business_rule: Some(serde_json::to_string(&items).unwrap()),
+            activity_planned_date: Some(date),
+            activity_problem: problem.map(|s| s.to_string()),
+            chats: vec![],
+            attachments: vec![],
+        }
+    }
+
+    fn make_test_card(date: NaiveDate, items: Vec<i64>) -> Activity {
+        Activity {
+            guid: None,
+            title: "Test Card".to_string(),
+            detail: "Detail".to_string(),
+            type_activity_code: 1,
+            planned_date: date,
+            replanned_date: date,
+            objective: "Obj".to_string(),
+            script: "Script".to_string(),
+            functional_requirements: "0001".to_string(),
+            business_rule: serde_json::to_string(&items).unwrap(),
+            workflow_stages: None,
+            problem: None,
+            chats: None,
+            attachments: None,
+        }
+    }
+
+    #[test]
+    fn test_merge_user_data() {
+        let date = NaiveDate::from_ymd_opt(2026, 8, 20).unwrap();
+        let dt1 =
+            NaiveDateTime::parse_from_str("2026-08-20 10:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+        let dt2 =
+            NaiveDateTime::parse_from_str("2026-08-20 11:00:00", "%Y-%m-%d %H:%M:%S").unwrap();
+
+        let mut act1 = make_test_activity(101, "guid-1", date, vec![1], Some("Problem A"));
+        act1.chats = vec![dealercrm::Chat {
+            activity_chat_code: 1,
+            activity_chat_guid: "chat-guid-1".to_string(),
+            activity_code: 101,
+            activity_chat_person_code: 42,
+            activity_chat_text: "First message".to_string(),
+            activity_chat_comment_date: dt1,
+        }];
+        act1.attachments = vec![dealercrm::Attachment {
+            activity_attachment_code: 1,
+            activity_attachment_guid: "att-guid-1".to_string(),
+            activity_code: 101,
+            activity_attachment_description: "Doc 1".to_string(),
+        }];
+
+        let mut act2 = make_test_activity(102, "guid-2", date, vec![2], Some("Problem B"));
+        act2.chats = vec![dealercrm::Chat {
+            activity_chat_code: 2,
+            activity_chat_guid: "chat-guid-2".to_string(),
+            activity_code: 102,
+            activity_chat_person_code: 43,
+            activity_chat_text: "Second message".to_string(),
+            activity_chat_comment_date: dt2,
+        }];
+        act2.attachments = vec![
+            dealercrm::Attachment {
+                activity_attachment_code: 2,
+                activity_attachment_guid: "att-guid-1".to_string(), // Duplicate GUID
+                activity_code: 102,
+                activity_attachment_description: "Doc 1 duplicate".to_string(),
+            },
+            dealercrm::Attachment {
+                activity_attachment_code: 3,
+                activity_attachment_guid: "att-guid-2".to_string(),
+                activity_code: 102,
+                activity_attachment_description: "Doc 2".to_string(),
+            },
+        ];
+
+        let (problem, chats, attachments) = merge_user_data(&[act1, act2], "guid-1");
+
+        assert_eq!(problem, Some("Problem A\n---\nProblem B".to_string()));
+        assert_eq!(chats.len(), 2);
+        assert_eq!(chats[0].guid, Some("chat-guid-1".to_string()));
+        assert_eq!(chats[0].comment_date, "2026-08-20T10:00:00");
+        // Secondary chat must have guid: None to prevent cross-parent update error in CRM
+        assert_eq!(chats[1].guid, None);
+        assert_eq!(chats[1].comment_date, "2026-08-20T11:00:00");
+
+        assert_eq!(attachments.len(), 2);
+        assert_eq!(attachments[0].guid, Some("att-guid-1".to_string()));
+        // Secondary attachment must have guid: None
+        assert_eq!(attachments[1].guid, None);
+    }
+
+    #[test]
+    fn test_merge_user_data_empty() {
+        let (problem, chats, attachments) = merge_user_data(&[], "guid-1");
+        assert_eq!(problem, None);
+        assert!(chats.is_empty());
+        assert!(attachments.is_empty());
+    }
+
+    #[test]
+    fn test_map_activities_exact_and_merge() {
+        let today = NaiveDate::from_ymd_opt(2026, 8, 21).unwrap();
+        let date1 = NaiveDate::from_ymd_opt(2026, 8, 25).unwrap();
+
+        // 2 old CRM cards on different dates that merge into 1 new card in Oracle
+        let act1 = make_test_activity(1, "guid-1", NaiveDate::from_ymd_opt(2026, 8, 20).unwrap(), vec![10], None);
+        let act2 = make_test_activity(2, "guid-2", NaiveDate::from_ymd_opt(2026, 8, 22).unwrap(), vec![20], None);
+
+        let new_card = make_test_card(date1, vec![10, 20]);
+
+        let buckets = map_activities_to_new_cards(vec![act1, act2], &[new_card], today);
+
+        assert_eq!(buckets.len(), 1);
+        assert_eq!(buckets[0].len(), 2);
+        assert_eq!(buckets[0][0].activity_guid, "guid-1");
+        assert_eq!(buckets[0][1].activity_guid, "guid-2");
+    }
+
+    #[test]
+    fn test_map_activities_split_closest_to_arrive() {
+        let today = NaiveDate::from_ymd_opt(2026, 8, 21).unwrap();
+        // New cards: Aug 25 (closest to arrive) vs Sep 10 (further)
+        let new_card1 = make_test_card(NaiveDate::from_ymd_opt(2026, 8, 25).unwrap(), vec![10]);
+        let new_card2 = make_test_card(NaiveDate::from_ymd_opt(2026, 9, 10).unwrap(), vec![20]);
+
+        // Old CRM card had both items [10, 20]
+        let act = make_test_activity(1, "guid-split", NaiveDate::from_ymd_opt(2026, 8, 15).unwrap(), vec![10, 20], None);
+
+        let buckets = map_activities_to_new_cards(vec![act], &[new_card1, new_card2], today);
+
+        // Tied intersection (1 item in card 0, 1 item in card 1)
+        // Should land in bucket 0 because Aug 25 is closest to arrive
+        assert_eq!(buckets[0].len(), 1);
+        assert_eq!(buckets[0][0].activity_guid, "guid-split");
+        assert_eq!(buckets[1].len(), 0);
+    }
+
+    #[test]
+    fn test_map_activities_deleted_item_fallback_closest_to_arrive() {
+        let today = NaiveDate::from_ymd_opt(2026, 8, 21).unwrap();
+        let new_card1 = make_test_card(NaiveDate::from_ymd_opt(2026, 8, 25).unwrap(), vec![100]);
+        let new_card2 = make_test_card(NaiveDate::from_ymd_opt(2026, 8, 28).unwrap(), vec![200]);
+
+        // Old CRM card had item [999] which was deleted from the order in Oracle
+        let act = make_test_activity(1, "guid-deleted", NaiveDate::from_ymd_opt(2026, 8, 15).unwrap(), vec![999], None);
+
+        let buckets = map_activities_to_new_cards(vec![act], &[new_card1, new_card2], today);
+
+        // 0 intersection with both -> falls back to closest to arrive (Aug 25)
+        assert_eq!(buckets[0].len(), 1);
+        assert_eq!(buckets[0][0].activity_guid, "guid-deleted");
+        assert_eq!(buckets[1].len(), 0);
+    }
+}
+

@@ -22,6 +22,25 @@ pub struct WorkflowStage {
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct ApiChat {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guid: Option<String>,
+    pub person_code: i64,
+    pub text: String,
+    /// ISO 8601 datetime, e.g. "2026-07-10T14:30:00"
+    pub comment_date: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiAttachment {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guid: Option<String>,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Activity {
     /// Only set when updating an existing card (PATCH). Omitted on POST.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -37,6 +56,15 @@ pub struct Activity {
     pub business_rule: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub workflow_stages: Option<Vec<WorkflowStage>>,
+    /// Merged Problem text from CRM duplicates. Not sent on POST (None).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub problem: Option<String>,
+    /// Existing chat GUIDs re-sent on PATCH so the API preserves them. Not sent on POST.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub chats: Option<Vec<ApiChat>>,
+    /// Existing attachment GUIDs re-sent on PATCH so the API preserves them. Not sent on POST.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachments: Option<Vec<ApiAttachment>>,
 }
 
 pub async fn new_card(card: &Activity) -> Result<()> {
@@ -88,6 +116,8 @@ pub async fn update_card(guid: &str, card: &Activity) -> Result<()> {
             guid
         )
     })?;
+
+    tracing::info!("PATCH payload for card {}: {}", guid, String::from_utf8_lossy(&body_bytes));
 
     let res = client
         .patch(&url)
